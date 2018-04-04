@@ -57,3 +57,8 @@ typings/
 # dotenv environment variables file
 .env
 
+# -----Ansible-----
+connor.fun.pem
+keys.yaml
+accessKeys.csv
+*.retry
