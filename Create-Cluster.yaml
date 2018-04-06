@@ -1,0 +1,98 @@
+# Load profiles for machines from profiles folder
+# Create Template Machine (Template -> Custodian)
+# 
+
+- name: Initialize an EC2 Cluster for data.connor.fun
+  hosts: local
+  
+  vars_files:
+    - keys.yaml
+    - security_groups.yaml
+    - machines.yaml
+    - config.yaml
+
+  tasks:
+
+    - name: Create necessary security group for cluster
+      ec2_group:
+        name: "{{item.name}}"
+        description: "{{item.description}}"
+        region: "{{region}}"
+        aws_access_key: "{{aws_auth.access}}"
+        aws_secret_key: "{{aws_auth.secret}}"
+        rules: "{{item.rules}}"
+        tags: "{{item.tags}}"
+      loop: "{{ security_groups }}"
+      register: Security_Response
+
+    #- debug:
+    #   msg: "{{Security_Response}}"
+
+
+    - name: Create Custodian/Base machine for AMI
+      ec2:
+        aws_access_key: "{{aws_auth.access}}"
+        aws_secret_key: "{{aws_auth.secret}}"
+        key_name: "{{ssh_key}}"
+        group: "{{Custodian.group}}"
+        instance_type: "{{Custodian.instance_type}}"
+        image: "{{Custodian.image}}"
+        wait: true
+        region: "{{region}}"
+        instance_tags: "{{Custodian.tags}}"
+      register: Custodian_Response
+
+    - debug:
+        msg: "{{Custodian_Response['instances'][0]['public_ip']}}"
+
+    - name: Save Custodian ip into Custodian_IP
+      set_fact:
+        Custodian_IP: "{{Custodian_Response['instances'][0]['public_ip']}}"
+        Custodian_ID: "{{Custodian_Response['instances'][0]['id']}}"
+
+    - debug:
+        msg: This is the Custodian_IP "{{Custodian_IP}}"
+
+
+    # CUSTODIAN INSTALL
+
+
+
+    # Create an AMI out of the Custodian
+
+    - name: Create an AMI of the Custodian Machine
+      ec2_ami:
+        aws_access_key: "{{aws_auth.access}}"
+        aws_secret_key: "{{aws_auth.secret}}"
+        instance_id: "{{Custodian_ID}}"
+        wait: yes
+        name: connor.fun-AMI
+        region: "{{region}}"
+        tags:
+          Name: connor.fun-AMI
+          "Team Name": connor.fun
+      register: AMI_Response
+
+    - debug:
+        msg: "{{AMI_Response}}"
+
+    - name: Save Custodian ip into Custodian_IP
+      set_fact:
+        Custodian_AMI: "{{AMI_Response['image_id']}}"
+
+
+    - name: Script to set up Worker machines for Storm
+      ec2:
+        aws_access_key: "{{aws_auth.access}}"
+        aws_secret_key: "{{aws_auth.secret}}"
+        key_name: "{{ssh_key}}"
+        group: "{{Worker.group}}"
+        instance_type: "{{Worker.instance_type}}"
+        image: "{{Custodian_AMI}}"
+        region: "{{region}}"
+        count: "{{Worker.count}}"
+        instance_tags: "{{Worker.tags}}"
+      register: Worker_Response
+    
+    - debug:
+        msg: "{{Worker_Response}}"
