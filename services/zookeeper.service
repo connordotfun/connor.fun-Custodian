@@ -1,0 +1,13 @@
+[Unit]
+Description=Zookeeper daemon
+
+[Service]
+Type=simple
+User=root
+Group=root
+Restart=on-failure
+WorkingDirectory=/home/ec2-user/zookeeper-3.4.11
+ExecStart=/home/ec2-user/zookeeper-3.4.11/bin/zkServer.sh start-foreground
+
+[Install]
+WantedBy=multi-user.target
