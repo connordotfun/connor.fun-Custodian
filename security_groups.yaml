@@ -1,0 +1,16 @@
+- security_groups:
+  - name: connor.fun-Bouncer
+    description: SSH and HTTP security group for connor.fun-Custodian
+    region: us-west-2
+    rules:
+      - proto: all
+        cidr_ip: 0.0.0.0/0
+        rule_desc: Allow all traffic because well figure this out later
+
+    rules_egress:
+      - proto: all
+        cidr_ip: 0.0.0.0/0
+        rule_desc: Allow all traffic because well figure this out later
+    tags:
+      "Name": "connor.fun-Bouncer"
+      "Team Name": "connor.fun"

@@ -1,0 +1,15 @@
+Custodian:
+  group: connor.fun-Bouncer
+  image: ami-4a787a2a
+  instance_type: t2.micro
+  tags:
+    "Name": "connor.fun-Custodian"
+    "Team Name": "connor.fun"
+
+Worker:
+    group: connor.fun-Bouncer
+    instance_type: t2.micro
+    count: 3
+    tags:
+      "Team Name": "connor.fun"
+      "Name": "Worker"
