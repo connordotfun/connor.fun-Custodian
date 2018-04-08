@@ -18,10 +18,8 @@ twitter_access:
   secret: "Secret"
 
 aws_auth:
-  access: "Top"
+  access: "Ultra"
   secret: "Secret"
-
-ssh_key: "Ultra Secret"
 ```
 
 ## Usage

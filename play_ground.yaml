@@ -1,0 +1,31 @@
+- name: Initialize an EC2 Cluster for data.connor.fun
+  hosts: all
+  
+  vars_files:
+    - keys.yaml
+    - security_groups.yaml
+    - machines.yaml
+    - config.yaml
+
+  tasks:
+
+    - name: add a host to file with specific key
+      add_host:
+        hostname: ##.###.###.212
+        ansible_ssh_private_key_file: "connor.fun.pem"
+        group: Custodian_Host
+        ansible_user: ec2-user
+    
+    #- debug:
+    #    msg: "{{hostvars}}"
+
+    - name: test
+      set_fact:
+        test_var: "Hello World I'm a test_var!"
+        custodian_ip: ##.###.###.212
+
+    - name: try something small
+      copy: 
+        content: "{{test_var}}"
+        dest: "test.txt"
+      delegate_to: "{{custodian_ip}}"
