@@ -2,10 +2,10 @@
   hosts: local
   
   vars_files:
-    - keys.yaml
-    - security_groups.yaml
-    - machines.yaml
-    - config.yaml
+    - vars/keys.yaml
+    - vars/security_groups.yaml
+    - vars/machines.yaml
+    - vars/config.yaml
 
   tasks:
 
