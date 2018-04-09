@@ -1,0 +1,5 @@
+# /home/ec2-user/apache-storm-1.2.1/conf/storm.yaml ON THE WORKER MACHINES
+
+storm.zookeeper.servers:
+    - "{{Nimbus_IP}}"
+nimbus.seeds: ["{{Nimbus_IP}}"]

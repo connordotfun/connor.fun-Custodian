@@ -27,5 +27,5 @@ aws_auth:
 To run the script run:
 
 ```bash
-ansible-playbook -i hosts Cluster-Initialization.yaml
+ansible-playbook -i hosts Create-Cluster.yaml
 ```

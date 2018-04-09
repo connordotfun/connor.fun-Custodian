@@ -62,3 +62,4 @@ connor.fun.pem
 keys.yaml
 accessKeys.csv
 *.retry
+*.gz

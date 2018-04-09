@@ -9,6 +9,22 @@
 
   tasks:
 
+    # ==== Begin Rule and Key Generation ====
+
+    - name: Get Base AMI ID
+      ec2_ami_facts:
+        aws_access_key: "{{aws_auth.access}}"
+        aws_secret_key: "{{aws_auth.secret}}"
+        region: "{{region}}"
+        owners: amazon
+        filters:
+          "name": "amzn2-ami-hvm-2017.12.0.20180115-x86_64-gp2"
+      register: base_ami
+
+    - name: Save AMI ID for generic linux
+      set_fact:
+        gen_ami_id: "{{base_ami['images'][0]['image_id']}}"
+
     - name: Create necessary security group for cluster
       ec2_group:
         aws_access_key: "{{aws_auth.access}}"
@@ -44,6 +60,8 @@
       set_fact:
         SSHKey_filename: "{{ssh_key_name + '.pem'}}"
 
+    # ==== Initialize Custodian and AMI ====
+
     - name: Create Custodian/Base machine for AMI
       ec2:
         aws_access_key: "{{aws_auth.access}}"
@@ -51,7 +69,7 @@
         key_name: "{{ssh_key_name}}"
         group: "{{Custodian.group}}"
         instance_type: "{{Custodian.instance_type}}"
-        image: "{{Custodian.image}}"
+        image: "{{gen_ami_id}}"
         wait: true
         region: "{{region}}"
         instance_tags: "{{Custodian.tags}}"
@@ -65,20 +83,39 @@
         Custodian_IP: "{{Custodian_Response['instances'][0]['public_ip']}}"
         Custodian_ID: "{{Custodian_Response['instances'][0]['id']}}"
 
-    - name: add a host to file with specific key
+    #- debug:
+    #    msg: This is the Custodian_IP "{{Custodian_IP}}"
+
+    - name: Add a Custodian as host to memory with Custodian_IP
       add_host:
-        hostname: 54.218.229.212
+        hostname: "{{Custodian_IP}}"
         ansible_ssh_private_key_file: "connor.fun.pem"
         group: Custodian_Host
         ansible_user: ec2-user
 
-    #- debug:
-    #    msg: This is the Custodian_IP "{{Custodian_IP}}"
+    - name: Wait for SSH to come up
+      wait_for:
+        host={{ Custodian_IP }} 
+        port=22 
+        state=started
 
-- name: Switch to Custodian and install 
-    # CUSTODIAN INSTALL
+    - name: Unarchive the Apache-Storm files
+      unarchive:
+          dest: /home/ec2-user
+          src: apache-storm-1.2.1.tar.gz
+      delegate_to: "{{Custodian_IP}}"
 
+    - name: Unarchive the Zookeeper files
+      unarchive:
+          dest: /home/ec2-user
+          src: zookeeper-3.4.11.tar.gz
+      delegate_to: "{{Custodian_IP}}"
 
+    - name: Create data directory in Zookeeper
+      file:
+        path: /home/ec2-user/zookeeper-3.4.11/data
+        state: directory
+      delegate_to: "{{Custodian_IP}}"
 
     # Create an AMI out of the Custodian
 
@@ -98,12 +135,12 @@
     #- debug:
     #    msg: "{{AMI_Response}}"
 
-    - name: Save Custodian ip into Custodian_IP
+    - name: Save Custodian AMI ID into Custodian_AMI
       set_fact:
         Custodian_AMI: "{{AMI_Response['image_id']}}"
 
 
-    - name: Script to set up Worker machines for Storm
+    - name: Create Worker Machines for Storm
       ec2:
         aws_access_key: "{{aws_auth.access}}"
         aws_secret_key: "{{aws_auth.secret}}"
@@ -116,5 +153,12 @@
         instance_tags: "{{Worker.tags}}"
       register: Worker_Response
     
-    #- debug:
-    #    msg: "{{Worker_Response}}"
+    - debug:
+        msg: "{{Worker_Response}}"
+
+    - name: Wait for SSH to come up
+      wait_for:
+        host={{ item.public_ip }} 
+        port=22 
+        state=started
+      with_items: Worker_Response['instances']
