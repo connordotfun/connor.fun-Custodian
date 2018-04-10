@@ -1,5 +1,6 @@
 - name: This is my playground for testing, it usually holds whatever I've been testing most recently
-  hosts: all
+  hosts: local
+  gather_facts: no
   
   vars_files:
     - vars/keys.yaml
@@ -8,10 +9,5 @@
     - vars/config.yaml
 
   vars:
-    test_var: "Hello World!"
 
   tasks:
-
-    - template:
-        src: test.conf.j2
-        dest: test.conf
