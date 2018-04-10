@@ -1,0 +1,189 @@
+- name: Create Custodian Machine and Create AMI of Custodian
+  hosts: local
+  
+  vars_files:
+    - vars/keys.yaml
+    - vars/machines.yaml
+    - vars/config.yaml
+
+  tasks:
+
+    - name: Get Base AMI ID
+      ec2_ami_facts:
+        aws_access_key: "{{ aws_auth.access }}"
+        aws_secret_key: "{{ aws_auth.secret }}"
+        region: "{{ region }}"
+        owners: amazon
+        filters:
+          "name": "amzn2-ami-hvm-2017.12.0.20180115-x86_64-gp2"
+      register: base_ami
+
+    - name: Make log of base ami search
+      copy: 
+        content: "{{ base_ami | to_nice_json }}"
+        dest: logs/Base_AMI_search.log
+
+    - name: Save AMI ID for generic linux
+      set_fact:
+        gen_ami_id: "{{ base_ami['images'][0]['image_id'] }}"
+
+
+    # ==== Initialize Custodian and AMI ====
+
+
+    - name: Create Custodian/Base machine for AMI
+      ec2:
+        aws_access_key: "{{ aws_auth.access }}"
+        aws_secret_key: "{{ aws_auth.secret }}"
+        key_name: "{{ ssh_key_name }}"
+        group: "{{ Custodian.group }}"
+        instance_type: "{{ Custodian.instance_type }}"
+        image: "{{ gen_ami_id }}"
+        wait: true
+        region: "{{ region }}"
+        instance_tags: "{{ Custodian.tags }}"
+      register: Custodian_Response
+
+    - name: Make log of Custodian_ec2 generation
+      copy: 
+        content: "{{ Custodian_Response | to_nice_json }}"
+        dest: logs/Custodian.json
+
+    - name: Save Custodian ip into Custodian_IP
+      set_fact:
+        Custodian_IP: "{{ Custodian_Response['instances'][0]['public_ip'] }}"
+        Custodian_ID: "{{ Custodian_Response['instances'][0]['id'] }}"
+
+    - name: Add a Custodian as host to memory with Custodian_IP
+      add_host:
+        hostname: "{{ Custodian_IP }}"
+        ansible_ssh_private_key_file: "connor.fun.pem"
+        group: Custodian_Host
+        ansible_user: ec2-user
+
+
+    # ==== Start Install stuff I guess ====
+
+
+    - name: Wait for SSH to come up
+      wait_for:
+        host: "{{  Custodian_IP  }}"
+        port: 22 
+        state: started
+
+    - name: Unarchive the Apache-Storm files
+      unarchive:
+          dest: /home/ec2-user
+          src: apache-storm-1.2.1.tar.gz
+      delegate_to: "{{ Custodian_IP }}"
+
+    - name: Unarchive the Zookeeper files
+      unarchive:
+          dest: /home/ec2-user
+          src: zookeeper-3.4.11.tar.gz
+      delegate_to: "{{ Custodian_IP }}"
+
+    - name: Create data directory in Zookeeper
+      file:
+        path: /home/ec2-user/zookeeper-3.4.11/data
+        state: directory
+      delegate_to: "{{ Custodian_IP }}"
+
+    # TODO - name: Add keys to environment variables
+
+    # TODO - INSTALL JAVA DAMNIT
+
+    - name: Install services BUT DO NOT ENABLE SERVICES
+      copy:
+        src: services/
+        dest: /etc/systemd/system/
+      become: yes
+      delegate_to: "{{ Custodian_IP }}"
+      register: services_install
+
+    - debug:
+        msg: "{{services_install}}"
+
+
+    # ==== Create AMI out of Custodian ====
+
+
+    # - name: Create an AMI of the Custodian Machine
+    #   ec2_ami:
+    #     aws_access_key: "{{ aws_auth.access }}"
+    #     aws_secret_key: "{{ aws_auth.secret }}"
+    #     instance_id: "{{ Custodian_ID }}"
+    #     wait: yes
+    #     name: connor.fun-AMI
+    #     region: "{{ region }}"
+    #     tags:
+    #       "Name": connor.fun-AMI
+    #       "Team Name": connor.fun
+    #   register: AMI_Response
+
+    # - name: Make log of AMI generation
+    #   copy: 
+    #     content: "{{ AMI_Response | to_nice_json }}"
+    #     dest: logs/AMI_generation.log
+
+    # SAVE AMI ID SOMEWHERE (or search for it???)
+
+
+    # ==== Template conf files for storm ====
+
+
+    - name: Template nimbus.conf
+      template:
+          src: templates/storm-nimbus.conf.j2
+          dest: configs/storm-nimbus.conf
+
+    - name: Template supervisors.conf
+      template:
+          src: templates/storm-supervisors.conf.j2
+          dest: configs/storm-supervisors.conf
+
+
+    # ==== Give Custodian Official Role of Nimbus ===
+
+
+    - name: Copy nimbus.conf to Custodian machine
+      copy:
+        src: configs/storm-nimbus.conf
+        dest: /home/ec2-user/apache-storm-1.2.1/conf/storm.yaml
+      delegate_to: "{{ Custodian_IP }}"
+
+    - name: Copy zoo.cfg to Custodian machine
+      copy:
+        src: configs/zoo.cfg
+        dest: /home/ec2-user/zookeeper-3.4.11/conf/zoo.cfg
+      delegate_to: "{{ Custodian_IP }}"
+
+    - name: Enable zookeeper service
+      systemd:
+        name: zookeeper
+        state: started
+        enabled: yes
+      become: yes
+      delegate_to: "{{ Custodian_IP }}"
+      register: enable_service
+
+    - name: Enable nimbus service
+      systemd:
+        name: storm-nimbus
+        state: started
+        enabled: yes
+      become: yes
+      delegate_to: "{{ Custodian_IP }}"
+      register: enable_service
+
+    - name: Enable ui service
+      systemd:
+        name: storm-ui
+        state: started
+        enabled: yes
+      become: yes
+      delegate_to: "{{ Custodian_IP }}"
+      register: enable_service
+
+    - debug:
+        msg: "{{enable_service}}"
