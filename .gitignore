@@ -63,3 +63,5 @@ accessKeys.csv
 *.retry
 *.gz
 *.conf
+environment
+logs/*.yaml

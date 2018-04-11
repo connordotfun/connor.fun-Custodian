@@ -6,32 +6,89 @@
     - vars/security_groups.yaml
     - vars/machines.yaml
     - vars/config.yaml
+  
+  vars:
+    worker_ips: []
 
   tasks:
+
+
+    # ==== Load AMI variable for Worker Machines ====
+
+
+    - name: Include AMI output in the workerAMI variable
+      include_vars:
+        file: logs/AMI_generation.yaml
+        name: workerAMI
+
+
+    # ==== Create Worker Machine instances ====
+
 
     - name: Create Worker Machines for Storm
       ec2:
         aws_access_key: "{{ aws_auth.access }}"
         aws_secret_key: "{{ aws_auth.secret }}"
-        key_name: "{{ ssh_key_name + '.pem' }}"
+        key_name: "{{ ssh_key_name }}"
         group: "{{ Worker.group }}"
         instance_type: "{{ Worker.instance_type }}"
-        image: "{{ Custodian_AMI }}"
+        image: "{{ workerAMI['image_id'] }}"
         region: "{{ region }}"
         count: "{{ Worker.count }}"
         instance_tags: "{{ Worker.tags }}"
       register: Worker_Response
     
-    - name: Make log of security group creation
+    - name: Make log of worker generation
       copy: 
-        content: "{{ Worker_Response | to_nice_json }}"
-        dest: logs/Worker_generation.log
+        content: "{{ Worker_Response | to_nice_yaml }}"
+        dest: logs/Worker_generation.yaml
 
-    - name: Wait for SSH to come up
+
+    # ==== Add Workers to hosts in memory ====
+
+
+    - name: Add workers to workers_ips
+      set_fact:
+        worker_ips: "{{ worker_ips }} + ['{{ item['public_ip'] }}']"
+      with_items: "{{ Worker_Response['instances'] }}"
+
+    - name: Add workers as hosts to memory with worker_ips
+      add_host:
+        hostname: "{{ item }}"
+        ansible_ssh_private_key_file: "{{ ssh_key_name + '.pem'}}"
+        group: Workers
+        ansible_user: ec2-user
+      with_items: "{{ worker_ips }}"
+
+
+    # ==== Wait for SSH for workers
+
+
+    - name: Wait for SSH to come up for workers
       wait_for:
-        host: "{{ item['public_ip'] }}"
+        host: "{{ item }}"
         port: 22
         state: started
-      with_items: "{{Worker_Response['instances']}}"
-    
-    - name: Copy supervisors.conf to machine
+      with_items: "{{ worker_ips }}"
+
+    - name: Copy supervisors.conf to workers
+      copy:
+        src: configs/storm-supervisors.conf
+        dest: /home/ec2-user/apache-storm-1.2.1/conf/storm.yaml
+      delegate_to: "{{ item }}"
+      with_items: "{{ worker_ips }}"
+
+    # ==== Start supervisor service on workers ====
+
+    - name: start supervisor service on workers
+      systemd:
+        name: storm-supervisor
+        state: started
+        enabled: yes
+      become: yes
+      delegate_to: "{{ item }}"
+      register: enable_service
+      with_items: "{{ worker_ips }}"
+
+    - debug:
+        msg: "{{ enable_service }}"

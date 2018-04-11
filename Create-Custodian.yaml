@@ -15,20 +15,20 @@
         region: "{{ region }}"
         owners: amazon
         filters:
-          "name": "amzn2-ami-hvm-2017.12.0.20180115-x86_64-gp2"
+          "name": "{{ base_ami_name }}"
       register: base_ami
 
     - name: Make log of base ami search
       copy: 
-        content: "{{ base_ami | to_nice_json }}"
-        dest: logs/Base_AMI_search.log
+        content: "{{ base_ami | to_nice_yaml }}"
+        dest: logs/Base_AMI_search.yaml
 
     - name: Save AMI ID for generic linux
       set_fact:
         gen_ami_id: "{{ base_ami['images'][0]['image_id'] }}"
 
 
-    # ==== Initialize Custodian and AMI ====
+    # ==== Initialize Custodian ====
 
 
     - name: Create Custodian/Base machine for AMI
@@ -46,18 +46,19 @@
 
     - name: Make log of Custodian_ec2 generation
       copy: 
-        content: "{{ Custodian_Response | to_nice_json }}"
-        dest: logs/Custodian.json
+        content: "{{ Custodian_Response | to_nice_yaml }}"
+        dest: logs/Custodian_generation.yaml
 
     - name: Save Custodian ip into Custodian_IP
       set_fact:
         Custodian_IP: "{{ Custodian_Response['instances'][0]['public_ip'] }}"
+        Custodian_Private: "{{ Custodian_Response['instances'][0]['private_ip'] }}"
         Custodian_ID: "{{ Custodian_Response['instances'][0]['id'] }}"
 
     - name: Add a Custodian as host to memory with Custodian_IP
       add_host:
         hostname: "{{ Custodian_IP }}"
-        ansible_ssh_private_key_file: "connor.fun.pem"
+        ansible_ssh_private_key_file: "{{ ssh_key_name + '.pem'}}"
         group: Custodian_Host
         ansible_user: ec2-user
 
@@ -67,20 +68,22 @@
 
     - name: Wait for SSH to come up
       wait_for:
-        host: "{{  Custodian_IP  }}"
+        host: "{{ Custodian_IP }}"
         port: 22 
         state: started
 
     - name: Unarchive the Apache-Storm files
       unarchive:
-          dest: /home/ec2-user
-          src: apache-storm-1.2.1.tar.gz
+        remote_src: yes
+        src: http://apache.claz.org/storm/apache-storm-1.2.1/apache-storm-1.2.1.tar.gz
+        dest: /home/ec2-user
       delegate_to: "{{ Custodian_IP }}"
 
     - name: Unarchive the Zookeeper files
       unarchive:
-          dest: /home/ec2-user
-          src: zookeeper-3.4.11.tar.gz
+        remote_src: yes
+        src: http://apache.claz.org/zookeeper/zookeeper-3.4.11/zookeeper-3.4.11.tar.gz
+        dest: /home/ec2-user
       delegate_to: "{{ Custodian_IP }}"
 
     - name: Create data directory in Zookeeper
@@ -89,9 +92,38 @@
         state: directory
       delegate_to: "{{ Custodian_IP }}"
 
-    # TODO - name: Add keys to environment variables
+    - name: Copy edited /etc/environment file
+      copy:
+        src: configs/environment
+        dest: /etc/environment
+      become: yes
+      delegate_to: "{{ Custodian_IP }}"
 
-    # TODO - INSTALL JAVA DAMNIT
+    - name: Install java-1.8.0-openjdk
+      yum:
+        name: java-1.8.0-openjdk
+        state: latest
+      become: yes
+      delegate_to: "{{ Custodian_IP }}"
+
+    - name: Wget maven repo
+      get_url:
+        url: http://repos.fedorapeople.org/repos/dchen/apache-maven/epel-apache-maven.repo
+        dest: /etc/yum.repos.d/epel-apache-maven.repo
+      become: yes
+      delegate_to: "{{ Custodian_IP }}"
+
+    - name: Sed command to change to openjdk 8
+      command: sed -i s/\$releasever/7/g /etc/yum.repos.d/epel-apache-maven.repo
+      become: yes
+      delegate_to: "{{ Custodian_IP }}"
+
+    - name: Install apache-maven
+      yum:
+        name: apache-maven
+        state: latest
+      become: yes
+      delegate_to: "{{ Custodian_IP }}"
 
     - name: Install services BUT DO NOT ENABLE SERVICES
       copy:
@@ -100,9 +132,6 @@
       become: yes
       delegate_to: "{{ Custodian_IP }}"
       register: services_install
-
-    - debug:
-        msg: "{{services_install}}"
 
 
     # ==== Create AMI out of Custodian ====
@@ -124,9 +153,7 @@
     # - name: Make log of AMI generation
     #   copy: 
     #     content: "{{ AMI_Response | to_nice_json }}"
-    #     dest: logs/AMI_generation.log
-
-    # SAVE AMI ID SOMEWHERE (or search for it???)
+    #     dest: logs/AMI_generation.yaml
 
 
     # ==== Template conf files for storm ====
@@ -184,6 +211,3 @@
       become: yes
       delegate_to: "{{ Custodian_IP }}"
       register: enable_service
-
-    - debug:
-        msg: "{{enable_service}}"

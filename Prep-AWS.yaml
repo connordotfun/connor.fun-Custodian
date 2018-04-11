@@ -19,14 +19,15 @@
         description: "{{ item.description }}"
         region: "{{ region }}"
         rules: "{{ item.rules }}"
+        rules_egress: "{{item.rules_egress}}"
         tags: "{{ item.tags }}"
       loop: "{{ security_groups }}"
       register: Security_Response
 
     - name: Make log of security group creation
       copy: 
-        content: "{{ Security_Response | to_nice_json }}"
-        dest: logs/Security_Group_generation.log
+        content: "{{ Security_Response | to_nice_yaml }}"
+        dest: logs/Security_Group_generation.yaml
 
     - name: Create ssh key for machines
       ec2_key:
@@ -38,10 +39,15 @@
 
     - name: Make log of sshkey generation
       copy: 
-        content: "{{ SSHKey_Response | to_nice_json }}"
-        dest: logs/SSHKey_generation.log
+        content: "{{ SSHKey_Response | to_nice_yaml }}"
+        dest: logs/SSHKey_generation.yaml
 
     - name: Save .pem file to local directory
       copy: 
         content: "{{ SSHKey_Response['key']['private_key'] }}"
         dest: "{{ ssh_key_name + '.pem' }}"
+
+    - name: Create /etc/environment file for later use
+      template:
+        src: templates/environment.j2
+        dest: configs/environment
