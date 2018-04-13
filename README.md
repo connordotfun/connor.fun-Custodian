@@ -13,37 +13,40 @@ connor.fun-Custodian
 ├── connor.fun.pem+
 ├── hosts
 │
+├── Prep-AWS.yaml
 ├── Create-Custodian.yaml
 ├── Create-Workers.yaml
-├── Prep-AWS.yaml
 │
 ├── LICENSE
 ├── README.md
 │
 ├── configs
-│   ├── environment+
-│   ├── storm-nimbus.conf+
-│   ├── storm-supervisors.conf+
-│   └── zoo.cfg
+│   ├── environment+
+│   ├── sample.properties+
+│   ├── storm-env.sh+
+│   ├── storm-nimbus.conf+
+│   ├── storm-supervisors.conf+
+│   └── zoo.cfg
 │
-├── logs
-│   ├── AMI_generation.yaml+
-│   ├── Base_AMI_search.yaml+
-│   ├── Custodian_generation.yaml+
-│   ├── Security_Group_generation.yaml+
-│   ├── SSHKey_generation.yaml+
-│   └── Worker_generation.yaml+
+├── logs+
+│   ├── AMI_generation.yaml+
+│   ├── Base_AMI_search.yaml+
+│   ├── Custodian_generation.yaml+
+│   ├── Security_Group_generation.yaml+
+│   ├── SSHKey_generation.yaml+
+│   └── Worker_generation.yaml+
 │
 ├── services
-│   ├── storm-nimbus.service
-│   ├── storm-supervisor.service
-│   ├── storm-ui.service
-│   └── zookeeper.service
+│   ├── storm-nimbus.service
+│   ├── storm-supervisor.service
+│   ├── storm-ui.service
+│   └── zookeeper.service
 │
 ├── templates
-│   ├── environment.j2
-│   ├── storm-nimbus.conf.j2
-│   └── storm-supervisors.conf.j2
+│   ├── environment.j2
+│   ├── sample.properties.j2
+│   ├── storm-nimbus.conf.j2
+│   └── storm-supervisors.conf.j2
 │
 └── vars
     ├── config.yaml*
