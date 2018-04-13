@@ -29,7 +29,7 @@
         content: "{{ Security_Response | to_nice_yaml }}"
         dest: logs/Security_Group_generation.yaml
 
-    - name: Create ssh key for machines
+    - name: Create SSH key for machines
       ec2_key:
         aws_access_key: "{{ aws_auth.access }}"
         aws_secret_key: "{{ aws_auth.secret }}"
@@ -37,17 +37,22 @@
         region: "{{ region }}"
       register: SSHKey_Response
 
-    - name: Make log of sshkey generation
+    - name: Make log of SSHkey generation
       copy: 
         content: "{{ SSHKey_Response | to_nice_yaml }}"
         dest: logs/SSHKey_generation.yaml
 
-    - name: Save .pem file to local directory
+    - name: Save .pem file to local directory (./)
       copy: 
         content: "{{ SSHKey_Response['key']['private_key'] }}"
         dest: "{{ ssh_key_name + '.pem' }}"
 
-    - name: Create /etc/environment file for later use
+    - name: Template configs/environment
       template:
         src: templates/environment.j2
         dest: configs/environment
+
+    - name: Template configs/storm-env.sh
+      template:
+        src: templates/environment.j2
+        dest: configs/storm-env.sh

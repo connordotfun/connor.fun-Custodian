@@ -56,12 +56,18 @@ typings/
 # dotenv environment variables file
 .env
 
-# -----Ansible-----
+# ---- connor.fun sensitive information ----
+
 *.pem
 keys.yaml
 accessKeys.csv
+configs/environment
+configs/sample.properties
+configs/storm-env.sh
+configs/*.conf
+logs/*.yaml
+
+# ---- connor.fun annoying things ----
+
 *.retry
 *.gz
-*.conf
-environment
-logs/*.yaml

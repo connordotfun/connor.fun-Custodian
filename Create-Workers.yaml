@@ -16,7 +16,7 @@
     # ==== Load AMI variable for Worker Machines ====
 
 
-    - name: Include AMI output in the workerAMI variable
+    - name: Include AMI output from Custodian as the workerAMI variable
       include_vars:
         file: logs/AMI_generation.yaml
         name: workerAMI
@@ -47,7 +47,7 @@
     # ==== Add Workers to hosts in memory ====
 
 
-    - name: Add workers to workers_ips
+    - name: Add workers' public ips to workers_ips
       set_fact:
         worker_ips: "{{ worker_ips }} + ['{{ item['public_ip'] }}']"
       with_items: "{{ Worker_Response['instances'] }}"
@@ -71,16 +71,17 @@
         state: started
       with_items: "{{ worker_ips }}"
 
-    - name: Copy supervisors.conf to workers
+    - name: Copy configs/storm-supervisors.conf to /home/ec2-user/apache-storm-1.2.1/conf/storm.yaml
       copy:
         src: configs/storm-supervisors.conf
         dest: /home/ec2-user/apache-storm-1.2.1/conf/storm.yaml
       delegate_to: "{{ item }}"
       with_items: "{{ worker_ips }}"
 
-    # ==== Start supervisor service on workers ====
 
-    - name: start supervisor service on workers
+    # ==== Start services on workers ====
+
+    - name: Start storm-supervisor service on workers
       systemd:
         name: storm-supervisor
         state: started
