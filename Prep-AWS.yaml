@@ -46,6 +46,7 @@
       copy: 
         content: "{{ SSHKey_Response['key']['private_key'] }}"
         dest: "{{ ssh_key_name + '.pem' }}"
+        mode: 0400
 
     - name: Template configs/environment
       template:

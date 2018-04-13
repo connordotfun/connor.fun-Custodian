@@ -86,7 +86,7 @@ If you wish to, you may tweak the `vars/machines.yaml` and `vars/security_groups
 
 ## Usage
 
-To create the basics for the network run:
+To create the basics for the network run, install `python-boto3` and `python-boto` then run:
 
 ```
 ansible-playbook -i hosts Prep-AWS.yaml
