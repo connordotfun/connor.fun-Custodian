@@ -1,0 +1,14 @@
+Custodian:
+  group: connor.fun-Bouncer
+  instance_type: t2.medium
+  tags:
+    "Name": "connor.fun-Custodian"
+    "Team Name": "connor.fun"
+
+Worker:
+  group: connor.fun-Bouncer
+  instance_type: t2.micro
+  count: 4
+  tags:
+    "Name": "Worker"
+    "Team Name": "connor.fun"

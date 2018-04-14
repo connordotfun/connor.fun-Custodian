@@ -1,2 +1,5 @@
+[defaults]
+host_key_checking=False
+
 [local]
 localhost ansible_connection=local
