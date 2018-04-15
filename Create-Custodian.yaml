@@ -63,7 +63,7 @@
         ansible_user: ec2-user
 
 
-    # ==== Template conf files for storm ====
+    # ==== Template conf files for storm and kafka ====
 
 
     - name: Template configs/nimbus.conf
@@ -80,6 +80,11 @@
       template:
           src: templates/sample.properties.j2
           dest: configs/sample.properties
+
+    - name: Template configs/server.properties
+      template:
+          src: templates/server.properties.j2
+          dest: configs/server.properties
 
 
     # ==== Start Installing Global Tools for Network ====
@@ -149,6 +154,13 @@
     - name: Install java-1.8.0-openjdk on Custodian
       yum:
         name: java-1.8.0-openjdk
+        state: latest
+      become: yes
+      delegate_to: "{{ Custodian_IP }}"
+
+    - name: Install golang on Custodian
+      yum:
+        name: golang
         state: latest
       become: yes
       delegate_to: "{{ Custodian_IP }}"
@@ -308,3 +320,32 @@
       args:
         chdir: /home/ec2-user/connor.fun-Storm
       delegate_to: "{{ Custodian_IP }}"
+
+    - name: Creating directory /home/ec2-user/connor.fun-StreamProducer to hold Stream Submodule
+      file:
+        path: /home/ec2-user/connor.fun-StreamProducer
+        state: directory
+      delegate_to: "{{ Custodian_IP }}"
+
+    - name: Copying ../Stream/ to /home/ec2-user/connor.fun-StreamProducer
+      copy:
+        src: ../Stream/
+        dest: /home/ec2-user/connor.fun-StreamProducer
+      delegate_to: "{{ Custodian_IP }}"
+
+    - name: Wget locations.json for stream producer
+      get_url:
+        url: https://cubigdataclass.github.io/connor.fun-SectorGenerator/data/locations.json
+        dest: /home/ec2-user/connor.fun-StreamProducer/locations.json
+      become: yes
+      delegate_to: "{{ Custodian_IP }}"
+
+    - name: Start the streamspout service
+      systemd:
+        name: streamproducer
+        state: started
+        enabled: yes
+      become: yes
+      delegate_to: "{{ Custodian_IP }}"
+
+    

@@ -71,10 +71,17 @@
         state: started
       with_items: "{{ worker_ips }}"
 
-    - name: Copy configs/storm-supervisors.conf to /home/ec2-user/apache-storm-1.2.1/conf/storm.yaml
+    - name: Copy configs/storm-supervisors.conf to /home/ec2-user/apache-storm/conf/storm.yaml
       copy:
         src: configs/storm-supervisors.conf
         dest: /home/ec2-user/apache-storm/conf/storm.yaml
+      delegate_to: "{{ item }}"
+      with_items: "{{ worker_ips }}"
+
+    - name: Copy configs/server.properties to /home/ec2-user/kafka/config/server.properties
+      copy:
+        src: configs/server.properties
+        dest: /home/ec2-user/kafka/config/server.properties
       delegate_to: "{{ item }}"
       with_items: "{{ worker_ips }}"
 
