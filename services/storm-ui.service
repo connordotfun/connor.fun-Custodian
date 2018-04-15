@@ -6,8 +6,8 @@ Type=simple
 User=ec2-user
 Group=ec2-user
 Restart=on-failure
-WorkingDirectory=/home/ec2-user/apache-storm-1.2.1 
-ExecStart=/home/ec2-user/apache-storm-1.2.1/bin/storm ui
+WorkingDirectory=/home/ec2-user/apache-storm
+ExecStart=/home/ec2-user/apache-storm/bin/storm ui
 
 [Install]
 WantedBy=multi-user.target

@@ -74,8 +74,15 @@
     - name: Copy configs/storm-supervisors.conf to /home/ec2-user/apache-storm-1.2.1/conf/storm.yaml
       copy:
         src: configs/storm-supervisors.conf
-        dest: /home/ec2-user/apache-storm-1.2.1/conf/storm.yaml
+        dest: /home/ec2-user/apache-storm/conf/storm.yaml
       delegate_to: "{{ item }}"
+      with_items: "{{ worker_ips }}"
+
+    - name: Set hostname of workers to workers public ip
+      hostname:
+        name: "{{ item }}"
+      delegate_to: "{{ item }}"
+      become: yes
       with_items: "{{ worker_ips }}"
 
 
@@ -91,5 +98,20 @@
       register: enable_service
       with_items: "{{ worker_ips }}"
 
-    - debug:
-        msg: "{{ enable_service }}"
+    - name: Enable storm-logviewer service on Workers
+      systemd:
+        name: storm-logviewer
+        state: started
+        enabled: yes
+      become: yes
+      delegate_to: "{{ item }}"
+      with_items: "{{worker_ips }}"
+
+    - name: Enable kafka-broker service on Workers
+      systemd:
+        name: kafka-broker
+        state: started
+        enabled: yes
+      become: yes
+      delegate_to: "{{ item }}"
+      with_items: "{{worker_ips }}"

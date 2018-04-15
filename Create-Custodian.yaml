@@ -91,23 +91,51 @@
         port: 22 
         state: started
 
+    - name: Create /home/ec2-user/apache-storm
+      file:
+        path: /home/ec2-user/apache-storm
+        state: directory
+      delegate_to: "{{ Custodian_IP }}"
+
+    - name: Create /home/ec2-user/zookeeper
+      file:
+        path: /home/ec2-user/zookeeper
+        state: directory
+      delegate_to: "{{ Custodian_IP }}"
+
+    - name: Create /home/ec2-user/kafka
+      file:
+        path: /home/ec2-user/kafka
+        state: directory
+      delegate_to: "{{ Custodian_IP }}"    
+
     - name: Unarchive the Apache-Storm files to /home/ec2-user
       unarchive:
         remote_src: yes
         src: http://apache.claz.org/storm/apache-storm-1.2.1/apache-storm-1.2.1.tar.gz
-        dest: /home/ec2-user
+        dest: /home/ec2-user/apache-storm/
+        extra_opts: [--strip-components=1]
       delegate_to: "{{ Custodian_IP }}"
 
     - name: Unarchive the Zookeeper files to /home/ec2-user
       unarchive:
         remote_src: yes
         src: http://apache.claz.org/zookeeper/zookeeper-3.4.11/zookeeper-3.4.11.tar.gz
-        dest: /home/ec2-user
+        dest: /home/ec2-user/zookeeper/
+        extra_opts: [--strip-components=1]
       delegate_to: "{{ Custodian_IP }}"
 
-    - name: Create /home/ec2-user/zookeeper-3.4.11/data directory
+    - name: Unarchive the kafka files to /home/ec2-user
+      unarchive:
+        remote_src: yes
+        src: http://mirrors.koehn.com/apache/kafka/1.1.0/kafka_2.11-1.1.0.tgz
+        dest: /home/ec2-user/kafka/
+        extra_opts: [--strip-components=1]
+      delegate_to: "{{ Custodian_IP }}"
+
+    - name: Create /home/ec2-user/zookeeper/data directory
       file:
-        path: /home/ec2-user/zookeeper-3.4.11/data
+        path: /home/ec2-user/zookeeper/data
         state: directory
       delegate_to: "{{ Custodian_IP }}"
 
@@ -151,7 +179,7 @@
       become: yes
       delegate_to: "{{ Custodian_IP }}"
 
-    - name: Install services from servics folder *but do not enable any services copied*
+    - name: Install services from services folder *but do not enable any services copied*
       copy:
         src: services/
         dest: /etc/systemd/system/
@@ -162,7 +190,7 @@
     - name: Copy configs/storm-env.sh to /home/ec2-user/apache-storm-1.2.1/conf/storm-env.sh
       copy:
         src: configs/storm-env.sh
-        dest: /home/ec2-user/apache-storm-1.2.1/conf/storm-env.sh
+        dest: /home/ec2-user/apache-storm/conf/storm-env.sh
       delegate_to: "{{ Custodian_IP }}"
 
 
@@ -191,16 +219,22 @@
     # ==== Give Custodian Official Role of Nimbus, Zookeeper, and UI host ====
 
     
+    - name: Set hostname of workers to workers public ip
+      hostname:
+        name: "{{ Custodian_IP }}"
+      become: yes
+      delegate_to: "{{ Custodian_IP }}"
+
     - name: Copy configs/zoo.cfg to /home/ec2-user/zookeeper-3.4.11/conf/zoo.cfg
       copy:
         src: configs/zoo.cfg
-        dest: /home/ec2-user/zookeeper-3.4.11/conf/zoo.cfg
+        dest: /home/ec2-user/zookeeper/conf/zoo.cfg
       delegate_to: "{{ Custodian_IP }}"
 
     - name: Copy configs/storm-nimbus.conf to /home/ec2-user/apache-storm-1.2.1/conf/storm.yaml
       copy:
         src: configs/storm-nimbus.conf
-        dest: /home/ec2-user/apache-storm-1.2.1/conf/storm.yaml
+        dest: /home/ec2-user/apache-storm/conf/storm.yaml
       delegate_to: "{{ Custodian_IP }}"
 
     - name: Enable zookeeper service on Custodian
@@ -210,7 +244,6 @@
         enabled: yes
       become: yes
       delegate_to: "{{ Custodian_IP }}"
-      register: enable_service
 
     - name: Enable storm-nimbus service on Custodian
       systemd:
@@ -219,7 +252,6 @@
         enabled: yes
       become: yes
       delegate_to: "{{ Custodian_IP }}"
-      register: enable_service
 
     - name: Enable storm-ui service on Custodian
       systemd:
@@ -228,7 +260,14 @@
         enabled: yes
       become: yes
       delegate_to: "{{ Custodian_IP }}"
-      register: enable_service
+
+    - name: Enable storm-logviewer service on Custodian
+      systemd:
+        name: storm-logviewer
+        state: started
+        enabled: yes
+      become: yes
+      delegate_to: "{{ Custodian_IP }}"
 
 
     # ==== Creation of Storm Topology ====
@@ -265,7 +304,7 @@
       delegate_to: "{{ Custodian_IP }}"
 
     - name: Pushing Storm topology from /home/ec2-user/connor.fun-Storm
-      command: /home/ec2-user/apache-storm-1.2.1/bin/storm jar target/storm-1.0.jar fun.connor.storm.ProcessTopology ./sample.properties RemoteMode
+      command: /home/ec2-user/apache-storm/bin/storm jar target/storm-1.0.jar fun.connor.storm.ProcessTopology ./sample.properties RemoteMode
       args:
         chdir: /home/ec2-user/connor.fun-Storm
       delegate_to: "{{ Custodian_IP }}"
