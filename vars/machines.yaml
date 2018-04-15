@@ -7,7 +7,7 @@ Custodian:
 
 Worker:
   group: connor.fun-Bouncer
-  instance_type: t2.micro
+  instance_type: t2.medium
   count: 4
   tags:
     "Name": "Worker"

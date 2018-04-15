@@ -11,6 +11,11 @@
 
     # ==== Begin Rule and Key Generation ====
 
+    - name: Creating logs folder in local directory
+      file:
+        path: logs
+        state: directory
+
     - name: Create necessary security group for cluster
       ec2_group:
         aws_access_key: "{{ aws_auth.access }}"
