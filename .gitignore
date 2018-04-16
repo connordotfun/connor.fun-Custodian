@@ -63,6 +63,7 @@ keys.yaml
 accessKeys.csv
 configs/environment
 configs/sample.properties
+configs/server.properties
 configs/storm-env.sh
 configs/*.conf
 logs/*.yaml
