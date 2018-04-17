@@ -81,10 +81,10 @@
           src: templates/sample.properties.j2
           dest: configs/sample.properties
 
-    - name: Template configs/server.properties
-      template:
-          src: templates/server.properties.j2
-          dest: configs/server.properties
+    # - name: Template configs/server.properties
+    #   template:
+    #       src: templates/server.properties.j2
+    #       dest: configs/server.properties
 
 
     # ==== Start Installing Global Tools for Network ====
@@ -209,23 +209,23 @@
     # ==== Create AMI out of Custodian ====
 
 
-    - name: Create an AMI of the Custodian Machine
-      ec2_ami:
-        aws_access_key: "{{ aws_auth.access }}"
-        aws_secret_key: "{{ aws_auth.secret }}"
-        instance_id: "{{ Custodian_ID }}"
-        wait: yes
-        name: connor.fun-AMI
-        region: "{{ region }}"
-        tags:
-          "Name": connor.fun-AMI
-          "Team Name": connor.fun
-      register: AMI_Response
+    # - name: Create an AMI of the Custodian Machine
+    #   ec2_ami:
+    #     aws_access_key: "{{ aws_auth.access }}"
+    #     aws_secret_key: "{{ aws_auth.secret }}"
+    #     instance_id: "{{ Custodian_ID }}"
+    #     wait: yes
+    #     name: connor.fun-AMI
+    #     region: "{{ region }}"
+    #     tags:
+    #       "Name": connor.fun-AMI
+    #       "Team Name": connor.fun
+    #   register: AMI_Response
 
-    - name: Make log of AMI generation
-      copy: 
-        content: "{{ AMI_Response | to_nice_json }}"
-        dest: logs/AMI_generation.yaml
+    # - name: Make log of AMI generation
+    #   copy: 
+    #     content: "{{ AMI_Response | to_nice_json }}"
+    #     dest: logs/AMI_generation.yaml
 
 
     # ==== Give Custodian Official Role of Nimbus, Zookeeper, and UI host ====

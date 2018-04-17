@@ -6,12 +6,16 @@
     - vars/security_groups.yaml
     - vars/machines.yaml
     - vars/config.yaml
+    - logs/Custodian_generation.yaml
   
   vars:
     worker_ips: []
 
   tasks:
 
+    - name: Set fact for custodian
+      set_fact:
+          Custodian_IP: "{{ instances[0]['public_ip'] }}"
 
     # ==== Load AMI variable for Worker Machines ====
 
@@ -36,6 +40,7 @@
         region: "{{ region }}"
         count: "{{ Worker.count }}"
         instance_tags: "{{ Worker.tags }}"
+        wait: true
       register: Worker_Response
     
     - name: Make log of worker generation
@@ -78,12 +83,24 @@
       delegate_to: "{{ item }}"
       with_items: "{{ worker_ips }}"
 
-    - name: Copy configs/server.properties to /home/ec2-user/kafka/config/server.properties
-      copy:
-        src: configs/server.properties
-        dest: /home/ec2-user/kafka/config/server.properties
+    - name: Template configs/server.properties
+      template:
+          src: templates/server.properties.j2
+          dest: /home/ec2-user/kafka/config/server.properties
       delegate_to: "{{ item }}"
-      with_items: "{{ worker_ips }}"
+      loop: "{{ worker_ips }}"
+      loop_control:
+        index_var: worker_id
+
+    # - name: Copy configs/server.properties to /home/ec2-user/kafka/config/server.properties
+    #   copy:
+    #     src: configs/server.properties
+    #     dest: /home/ec2-user/kafka/config/server.properties
+    #   delegate_to: "{{ item }}"
+    #   with_items: "{{ worker_ips }}"
+    #   loop: "{{ worker_ips }}"
+    #   loop_control:
+    #     index_var: worker_id
 
     - name: Set hostname of workers to workers public ip
       hostname:
