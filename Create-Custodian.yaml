@@ -81,11 +81,6 @@
           src: templates/sample.properties.j2
           dest: configs/sample.properties
 
-    # - name: Template configs/server.properties
-    #   template:
-    #       src: templates/server.properties.j2
-    #       dest: configs/server.properties
-
 
     # ==== Start Installing Global Tools for Network ====
 
@@ -199,7 +194,7 @@
       delegate_to: "{{ Custodian_IP }}"
       register: services_install
 
-    - name: Copy configs/storm-env.sh to /home/ec2-user/apache-storm-1.2.1/conf/storm-env.sh
+    - name: Copy configs/storm-env.sh to /home/ec2-user/apache-storm/conf/storm-env.sh
       copy:
         src: configs/storm-env.sh
         dest: /home/ec2-user/apache-storm/conf/storm-env.sh
@@ -209,23 +204,24 @@
     # ==== Create AMI out of Custodian ====
 
 
-    # - name: Create an AMI of the Custodian Machine
-    #   ec2_ami:
-    #     aws_access_key: "{{ aws_auth.access }}"
-    #     aws_secret_key: "{{ aws_auth.secret }}"
-    #     instance_id: "{{ Custodian_ID }}"
-    #     wait: yes
-    #     name: connor.fun-AMI
-    #     region: "{{ region }}"
-    #     tags:
-    #       "Name": connor.fun-AMI
-    #       "Team Name": connor.fun
-    #   register: AMI_Response
+    - name: Create an AMI of the Custodian Machine
+      ec2_ami:
+        aws_access_key: "{{ aws_auth.access }}"
+        aws_secret_key: "{{ aws_auth.secret }}"
+        instance_id: "{{ Custodian_ID }}"
+        wait: yes
+        name: connor.fun-AMI
+        region: "{{ region }}"
+        delete_snapshot: yes
+        tags:
+          "Name": connor.fun-AMI
+          "Team Name": connor.fun
+      register: AMI_Response
 
-    # - name: Make log of AMI generation
-    #   copy: 
-    #     content: "{{ AMI_Response | to_nice_json }}"
-    #     dest: logs/AMI_generation.yaml
+    - name: Make log of AMI generation
+      copy: 
+        content: "{{ AMI_Response | to_nice_yaml }}"
+        dest: logs/AMI_generation.yaml
 
 
     # ==== Give Custodian Official Role of Nimbus, Zookeeper, and UI host ====
@@ -237,13 +233,13 @@
       become: yes
       delegate_to: "{{ Custodian_IP }}"
 
-    - name: Copy configs/zoo.cfg to /home/ec2-user/zookeeper-3.4.11/conf/zoo.cfg
+    - name: Copy configs/zoo.cfg to /home/ec2-user/zookeeper/conf/zoo.cfg
       copy:
         src: configs/zoo.cfg
         dest: /home/ec2-user/zookeeper/conf/zoo.cfg
       delegate_to: "{{ Custodian_IP }}"
 
-    - name: Copy configs/storm-nimbus.conf to /home/ec2-user/apache-storm-1.2.1/conf/storm.yaml
+    - name: Copy configs/storm-nimbus.conf to /home/ec2-user/apache-storm/conf/storm.yaml
       copy:
         src: configs/storm-nimbus.conf
         dest: /home/ec2-user/apache-storm/conf/storm.yaml

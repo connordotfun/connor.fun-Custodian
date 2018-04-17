@@ -6,24 +6,29 @@
     - vars/security_groups.yaml
     - vars/machines.yaml
     - vars/config.yaml
-    - logs/Custodian_generation.yaml
   
   vars:
     worker_ips: []
 
   tasks:
 
-    - name: Set fact for custodian
-      set_fact:
-          Custodian_IP: "{{ instances[0]['public_ip'] }}"
 
-    # ==== Load AMI variable for Worker Machines ====
+    # ==== Load Variables from logs ====
 
 
     - name: Include AMI output from Custodian as the workerAMI variable
       include_vars:
         file: logs/AMI_generation.yaml
-        name: workerAMI
+        name: workerAMI_log
+
+    - name: Include ec2 output from Custodian as the Custodian variable
+      include_vars:
+        file: logs/Custodian_generation.yaml
+        name: Custodian_log
+
+    - name: Set fact for custodian
+      set_fact:
+          Custodian_IP: "{{ Custodian_log['instances'][0]['public_ip'] }}"
 
 
     # ==== Create Worker Machine instances ====
@@ -36,7 +41,7 @@
         key_name: "{{ ssh_key_name }}"
         group: "{{ Worker.group }}"
         instance_type: "{{ Worker.instance_type }}"
-        image: "{{ workerAMI['image_id'] }}"
+        image: "{{ workerAMI_log['image_id'] }}"
         region: "{{ region }}"
         count: "{{ Worker.count }}"
         instance_tags: "{{ Worker.tags }}"
@@ -83,7 +88,7 @@
       delegate_to: "{{ item }}"
       with_items: "{{ worker_ips }}"
 
-    - name: Template configs/server.properties
+    - name: Template configs/server.properties to /home/ec2-user/kafka/config/server.properties
       template:
           src: templates/server.properties.j2
           dest: /home/ec2-user/kafka/config/server.properties
@@ -91,16 +96,6 @@
       loop: "{{ worker_ips }}"
       loop_control:
         index_var: worker_id
-
-    # - name: Copy configs/server.properties to /home/ec2-user/kafka/config/server.properties
-    #   copy:
-    #     src: configs/server.properties
-    #     dest: /home/ec2-user/kafka/config/server.properties
-    #   delegate_to: "{{ item }}"
-    #   with_items: "{{ worker_ips }}"
-    #   loop: "{{ worker_ips }}"
-    #   loop_control:
-    #     index_var: worker_id
 
     - name: Set hostname of workers to workers public ip
       hostname:
@@ -111,6 +106,7 @@
 
 
     # ==== Start services on workers ====
+
 
     - name: Start storm-supervisor service on workers
       systemd:
