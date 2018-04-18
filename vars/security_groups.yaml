@@ -1,15 +1,14 @@
-- security_groups:
-  - name: connor.fun-Bouncer
-    description: SSH and HTTP security group for connor.fun-Custodian
-    rules: # Inbound rules
-      - proto: all
-        cidr_ip: 0.0.0.0/0
-        rule_desc: Allow all traffic because well figure this out later
-
-    rules_egress: # Outbound rules
-      - proto: all
-        cidr_ip: 0.0.0.0/0
-        rule_desc: Allow all traffic because well figure this out later
-    tags:
-      "Name": "connor.fun-Bouncer"
-      "Team Name": "connor.fun"
+Security_Group:
+  name: connor.fun-Bouncer
+  description: SSH and HTTP security group for connor.fun-Custodian
+  rules: # Inbound rules
+    - proto: all
+      cidr_ip: 0.0.0.0/0
+      rule_desc: Allow all traffic because well figure this out later
+  rules_egress: # Outbound rules
+    - proto: all
+      cidr_ip: 0.0.0.0/0
+      rule_desc: Allow all traffic because well figure this out later
+  tags:
+    "Name": "connor.fun-Bouncer"
+    "Team Name": "connor.fun"
