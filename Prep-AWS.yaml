@@ -31,6 +31,12 @@
     region: "{{ region }}"
   register: SSHKey_Response
 
+- block:
+  - debug:
+      msg: "{{ 'Please delete the key_pair in ' + region }}"
+  - meta: end_play
+  when: SSHKey_Response['msg'] == "key pair already exists"
+
 - name: Make log of SSHkey generation
   copy: 
     content: "{{ SSHKey_Response | to_nice_yaml }}"

@@ -84,7 +84,7 @@
   delegate_to: "{{ item }}"
   loop: "{{ worker_ips }}"
   loop_control:
-    index_var: worker_id
+    index_var: kafka_ID
 
 - name: Set hostname of workers to workers public ip
   hostname:
@@ -106,21 +106,3 @@
   delegate_to: "{{ item }}"
   register: enable_service
   with_items: "{{ worker_ips }}"
-
-- name: Enable storm-logviewer service on Workers
-  systemd:
-    name: storm-logviewer
-    state: started
-    enabled: yes
-  become: yes
-  delegate_to: "{{ item }}"
-  with_items: "{{worker_ips }}"
-
-- name: Enable kafka-broker service on Workers
-  systemd:
-    name: kafka-broker
-    state: started
-    enabled: yes
-  become: yes
-  delegate_to: "{{ item }}"
-  with_items: "{{worker_ips }}"

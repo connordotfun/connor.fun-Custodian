@@ -150,8 +150,13 @@
 
 - name: Yum install on Custodian
   yum:
-    name: java-1.8.0-openjdk, golang, apache-maven, git, gcc-c++
+    name: java-1.8.0-openjdk, golang, apache-maven, git, gcc-c++, python3, python3-pip
     state: latest
+  become: yes
+  delegate_to: "{{ Custodian_IP }}"
+
+- name: Install boto and boto3 for python3
+  command: pip3 install boto boto3
   become: yes
   delegate_to: "{{ Custodian_IP }}"
 
@@ -182,9 +187,45 @@
   become: yes
   delegate_to: "{{ Custodian_IP }}"
 
+- name: Set Kafka ID
+  set_fact:
+    kafka_ID: 9999
+
+- name: Template configs/server.properties to /home/ec2-user/kafka/config/server.properties
+  template:
+      src: templates/server.properties.j2
+      dest: /home/ec2-user/kafka/config/server.properties
+  delegate_to: "{{ Custodian_IP }}"
+
+- name: Enable kafka-broker service on AMI
+  systemd:
+    name: kafka-broker
+    state: started
+    enabled: yes
+  become: yes
+  delegate_to: "{{ Custodian_IP }}"
+
+- name: Enable storm-logviewer service on Custodian
+  systemd:
+    name: storm-logviewer
+    state: started
+    enabled: yes
+  become: yes
+  delegate_to: "{{ Custodian_IP }}"
+
 
 # ==== Create AMI out of Custodian ====
 
+
+- name: test out ec2_ami_facts
+  ec2_ami_facts:
+    aws_access_key: "{{ aws_auth.access }}"
+    aws_secret_key: "{{ aws_auth.secret }}"
+    describe_image_attributes: yes
+    region: "{{ region }}"
+    filters:
+      name: connor.fun-AMI
+  register: AMI_Search
 
 - name: Create an AMI of the Custodian Machine
   ec2_ami:
@@ -199,11 +240,19 @@
       "Name": connor.fun-AMI
       "Team Name": connor.fun
   register: AMI_Response
+  when: AMI_Search["images"] == []
 
 - name: Make log of AMI generation
   copy: 
     content: "{{ AMI_Response | to_nice_yaml }}"
     dest: logs/AMI_generation.yaml
+  when: AMI_Search["images"] == []
+
+- name: Make log of AMI generation
+  copy: 
+    content: "{{ AMI_Search['images'][0] | to_nice_yaml }}"
+    dest: logs/AMI_generation.yaml
+  when: AMI_Search["images"] != []
 
 
 # ==== Give Custodian Official Role of Nimbus, Zookeeper, and UI host ====
@@ -251,13 +300,6 @@
   become: yes
   delegate_to: "{{ Custodian_IP }}"
 
-- name: Enable storm-logviewer service on Custodian
-  systemd:
-    name: storm-logviewer
-    state: started
-    enabled: yes
-  become: yes
-  delegate_to: "{{ Custodian_IP }}"
 
 
 # ==== Creation of Storm Topology ====
