@@ -44,12 +44,12 @@
 
 - name: Template configs/environment
   template:
-    src: templates/environment.j1
+    src: templates/environment.j2
     dest: configs/environment
 
 - name: Template configs/environmentmd
   template:
-    src: templates/environmentmd.j1
+    src: templates/environmentmd.j2
     dest: configs/environmentmd
 
 - name: Template configs/storm-env.sh
