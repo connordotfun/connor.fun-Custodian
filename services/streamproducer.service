@@ -2,6 +2,7 @@
 Description=regionSpout daemon
 
 [Service]
+EnvironmentFile=/etc/enviromentmd
 Type=simple
 User=ec2-user
 Group=ec2-user
