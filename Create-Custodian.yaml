@@ -196,7 +196,7 @@
 
 - name: Set Kafka ID
   set_fact:
-    kafka_ID: 9999
+    kafka_ID: 10
 
 - name: Template configs/server.properties to /home/ec2-user/kafka/config/server.properties
   template:
@@ -336,6 +336,12 @@
     dest: /home/ec2-user/connor.fun-StreamProducer
   delegate_to: "{{ Custodian_IP }}"
 
+- name: chmod +x on /home/ec2-user/connor.fun-StreamProducer/regionSpout
+  file:
+    path: /home/ec2-user/connor.fun-StreamProducer/regionSpout
+    mode: "u+x"
+  delegate_to: "{{ Custodian_IP }}"
+
 - name: Copying configs/sample.properties to /home/ec2-user/connor.fun-Storm/sample.properties
   copy:
     src: configs/sample.properties
@@ -364,7 +370,6 @@
   get_url:
     url: https://cubigdataclass.github.io/connor.fun-SectorGenerator/data/locations.json
     dest: /home/ec2-user/connor.fun-StreamProducer/locations.json
-  become: yes
   delegate_to: "{{ Custodian_IP }}"
 
 - name: Start the streamspout service
