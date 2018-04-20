@@ -136,6 +136,13 @@
   become: yes
   delegate_to: "{{ Custodian_IP }}"
 
+- name: Copy configs/environmentmd to /etc/environmentmd
+  copy:
+    src: configs/environmentmd
+    dest: /etc/environmentmd
+  become: yes
+  delegate_to: "{{ Custodian_IP }}"
+
 - name: Wget maven repo information into /etc/yum.repos.d/epel-apache-maven.repo
   get_url:
     url: http://repos.fedorapeople.org/repos/dchen/apache-maven/epel-apache-maven.repo
