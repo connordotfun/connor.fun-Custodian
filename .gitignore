@@ -62,6 +62,7 @@ typings/
 keys.yaml
 accessKeys.csv
 configs/environment
+configs/environmentmd
 configs/sample.properties
 configs/server.properties
 configs/storm-env.sh
