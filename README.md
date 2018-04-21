@@ -1,4 +1,5 @@
 # connor.fun-Custodian
+
 This is the repo that contains the files and instructions to get started in your moody weather journey!
 
 ## Requirements
@@ -7,50 +8,61 @@ This is the repo that contains the files and instructions to get started in your
 
 *'d files are supplied by you
 
-```
-connor.fun-Custodian
+```bash
+Custodian
 │
-├── connor.fun.pem+
-├── hosts
-│
+├── Create.yaml
 ├── Prep-AWS.yaml
 ├── Create-Custodian.yaml
 ├── Create-Workers.yaml
 │
+├── Remove.yaml
+├── Clean_AWS.yaml
+├── Remove-Cluster.yaml
+│
+├── hosts
 ├── LICENSE
 ├── README.md
 │
 ├── configs
-│   ├── environment+
-│   ├── sample.properties+
-│   ├── storm-env.sh+
-│   ├── storm-nimbus.conf+
-│   ├── storm-supervisors.conf+
+│   ├── environment
+│   ├── environmentmd
+│   ├── librdkafka_install.sh
+│   ├── sample.properties
+│   ├── server.properties
+│   ├── storm-env.sh
+│   ├── storm-nimbus.conf
+│   ├── storm-supervisors.conf
 │   └── zoo.cfg
 │
-├── logs+
-│   ├── AMI_generation.yaml+
-│   ├── Base_AMI_search.yaml+
-│   ├── Custodian_generation.yaml+
-│   ├── Security_Group_generation.yaml+
-│   ├── SSHKey_generation.yaml+
-│   └── Worker_generation.yaml+
+├─+ logs
+│ + ├── AMI_generation.yaml
+│ + ├── Base_AMI_search.yaml
+│ + ├── Custodian_generation.yaml
+│ + ├── Security_Group_generation.yaml
+│ + ├── SSHKey_generation.yaml
+│ + └── Worker_generation.yaml
 │
 ├── services
+│   ├── kafka-broker.service
+│   ├── storm-logviewer.service
 │   ├── storm-nimbus.service
 │   ├── storm-supervisor.service
 │   ├── storm-ui.service
+│   ├── streamproducer.service
 │   └── zookeeper.service
 │
 ├── templates
 │   ├── environment.j2
+│   ├── environmentmd.j2
 │   ├── sample.properties.j2
+│   ├── server.properties.j2
 │   ├── storm-nimbus.conf.j2
 │   └── storm-supervisors.conf.j2
 │
 └── vars
-    ├── config.yaml*
-    ├── keys.yaml*
+  * ├── config.yaml
+  * ├── keys.yaml
     ├── machines.yaml
     └── security_groups.yaml
 ```
@@ -86,20 +98,20 @@ If you wish to, you may tweak the `vars/machines.yaml` and `vars/security_groups
 
 ## Usage
 
-To create the basics for the network run, install `python-boto3` and `python-boto` then run:
+To complete spin up a cluster use the command:
 
-```
-ansible-playbook -i hosts Prep-AWS.yaml
-```
-
-To create the Custodian machine and it's AMI run:
-
-```
-ansible-playbook -i hosts Create-Custodian.yaml
+```bash
+ansible-playbook -i hosts Create.yaml --extra-vars "doPrep=op doCustodian=op doWorkers=op"
 ```
 
-To create the Worker machines run:
+where `op` is either `true` or `false`.
 
+For example, if you have already prepped AWS then you can say:
+
+```bash
+ansible-playbook -i hosts Create.yaml --extra-vars "doPrep=false doCustodian=true doWorkers=true"
 ```
-ansible-playbook -i hosts Create-Workers.yaml
-```
+
+## Other Notes
+
+1. If you want to add more workers, you must take down all current workers and create a new set of workers with the script due to a Kafka worker_id dependency. (These actions can be done at the same time)

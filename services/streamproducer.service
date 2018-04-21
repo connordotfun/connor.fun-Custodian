@@ -1,0 +1,14 @@
+[Unit]
+Description=regionSpout daemon
+
+[Service]
+EnvironmentFile=/etc/environmentmd
+Type=simple
+User=ec2-user
+Group=ec2-user
+Restart=on-failure
+WorkingDirectory=/home/ec2-user/connor.fun-StreamProducer
+ExecStart=/home/ec2-user/connor.fun-StreamProducer/regionSpout
+
+[Install]
+WantedBy=multi-user.target

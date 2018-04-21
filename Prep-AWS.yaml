@@ -1,59 +1,64 @@
-- name: Prepare AWS environment for connor.fun storm network
-  hosts: local
-  
-  vars_files:
-    - vars/keys.yaml
-    - vars/security_groups.yaml
-    - vars/machines.yaml
-    - vars/config.yaml
+# ==== Begin Rule and Key Generation ====
 
-  tasks:
 
-    # ==== Begin Rule and Key Generation ====
+- name: Creating logs folder in local directory
+  file:
+    path: logs
+    state: directory
 
-    - name: Create necessary security group for cluster
-      ec2_group:
-        aws_access_key: "{{ aws_auth.access }}"
-        aws_secret_key: "{{ aws_auth.secret }}"
-        name: "{{ item.name }}"
-        description: "{{ item.description }}"
-        region: "{{ region }}"
-        rules: "{{ item.rules }}"
-        rules_egress: "{{item.rules_egress}}"
-        tags: "{{ item.tags }}"
-      loop: "{{ security_groups }}"
-      register: Security_Response
+- name: Create necessary security group for cluster
+  ec2_group:
+    aws_access_key: "{{ aws_auth.access }}"
+    aws_secret_key: "{{ aws_auth.secret }}"
+    name: "{{ Security_Group.name }}"
+    description: "{{ Security_Group.description }}"
+    region: "{{ region }}"
+    rules: "{{ Security_Group.rules }}"
+    rules_egress: "{{Security_Group.rules_egress}}"
+    tags: "{{ Security_Group.tags }}"
+  register: Security_Response
 
-    - name: Make log of security group creation
-      copy: 
-        content: "{{ Security_Response | to_nice_yaml }}"
-        dest: logs/Security_Group_generation.yaml
+- name: Make log of security group creation
+  copy: 
+    content: "{{ Security_Response | to_nice_yaml }}"
+    dest: logs/Security_Group_generation.yaml
 
-    - name: Create SSH key for machines
-      ec2_key:
-        aws_access_key: "{{ aws_auth.access }}"
-        aws_secret_key: "{{ aws_auth.secret }}"
-        name: "{{ ssh_key_name }}"
-        region: "{{ region }}"
-      register: SSHKey_Response
+- name: Create SSH key for machines
+  ec2_key:
+    aws_access_key: "{{ aws_auth.access }}"
+    aws_secret_key: "{{ aws_auth.secret }}"
+    name: "{{ ssh_key_name }}"
+    region: "{{ region }}"
+  register: SSHKey_Response
 
-    - name: Make log of SSHkey generation
-      copy: 
-        content: "{{ SSHKey_Response | to_nice_yaml }}"
-        dest: logs/SSHKey_generation.yaml
+- block:
+  - debug:
+      msg: "{{ 'Please delete the key_pair in ' + region }}"
+  - meta: end_play
+  when: SSHKey_Response['msg'] == "key pair already exists"
 
-    - name: Save .pem file to local directory (./)
-      copy: 
-        content: "{{ SSHKey_Response['key']['private_key'] }}"
-        dest: "{{ ssh_key_name + '.pem' }}"
-        mode: 0400
+- name: Make log of SSHkey generation
+  copy: 
+    content: "{{ SSHKey_Response | to_nice_yaml }}"
+    dest: logs/SSHKey_generation.yaml
 
-    - name: Template configs/environment
-      template:
-        src: templates/environment.j2
-        dest: configs/environment
+- name: Save .pem file to local directory (./)
+  copy: 
+    content: "{{ SSHKey_Response['key']['private_key'] }}"
+    dest: "{{ region + '.' + ssh_key_name + '.pem' }}"
+    mode: 0400
 
-    - name: Template configs/storm-env.sh
-      template:
-        src: templates/environment.j2
-        dest: configs/storm-env.sh
+- name: Template configs/environment
+  template:
+    src: templates/environment.j2
+    dest: configs/environment
+
+- name: Template configs/environmentmd
+  template:
+    src: templates/environmentmd.j2
+    dest: configs/environmentmd
+
+- name: Template configs/storm-env.sh
+  template:
+    src: templates/environment.j2
+    dest: configs/storm-env.sh

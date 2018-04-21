@@ -1,95 +1,108 @@
-- name: Prepare AWS environment for connor.fun storm network
-  hosts: local
-  
-  vars_files:
-    - vars/keys.yaml
-    - vars/security_groups.yaml
-    - vars/machines.yaml
-    - vars/config.yaml
-  
-  vars:
-    worker_ips: []
-
-  tasks:
+# ==== Load Variables from logs ====
 
 
-    # ==== Load AMI variable for Worker Machines ====
+- name: Include AMI output from Custodian as the workerAMI variable
+  include_vars:
+    file: logs/AMI_generation.yaml
+    name: workerAMI_log
+
+- name: Include ec2 output from Custodian as the Custodian variable
+  include_vars:
+    file: logs/Custodian_generation.yaml
+    name: Custodian_log
+
+- name: Set fact for custodian
+  set_fact:
+      Custodian_IP: "{{ Custodian_log['instances'][0]['public_ip'] }}"
+
+- name: Set worker_ips fact
+  set_fact:
+      worker_ips: []
 
 
-    - name: Include AMI output from Custodian as the workerAMI variable
-      include_vars:
-        file: logs/AMI_generation.yaml
-        name: workerAMI
+# ==== Create Worker Machine instances ====
 
 
-    # ==== Create Worker Machine instances ====
+- name: Create Worker Machines for Storm
+  ec2:
+    aws_access_key: "{{ aws_auth.access }}"
+    aws_secret_key: "{{ aws_auth.secret }}"
+    key_name: "{{ ssh_key_name }}"
+    group: "{{ Worker.group }}"
+    instance_type: "{{ Worker.instance_type }}"
+    image: "{{ workerAMI_log['image_id'] }}"
+    region: "{{ region }}"
+    count: "{{ Worker.count }}"
+    instance_tags: "{{ Worker.tags }}"
+    wait: true
+  register: Worker_Response
+
+- name: Make log of worker generation
+  copy: 
+    content: "{{ Worker_Response | to_nice_yaml }}"
+    dest: logs/Worker_generation.yaml
 
 
-    - name: Create Worker Machines for Storm
-      ec2:
-        aws_access_key: "{{ aws_auth.access }}"
-        aws_secret_key: "{{ aws_auth.secret }}"
-        key_name: "{{ ssh_key_name }}"
-        group: "{{ Worker.group }}"
-        instance_type: "{{ Worker.instance_type }}"
-        image: "{{ workerAMI['image_id'] }}"
-        region: "{{ region }}"
-        count: "{{ Worker.count }}"
-        instance_tags: "{{ Worker.tags }}"
-      register: Worker_Response
-    
-    - name: Make log of worker generation
-      copy: 
-        content: "{{ Worker_Response | to_nice_yaml }}"
-        dest: logs/Worker_generation.yaml
+# ==== Add Workers to hosts in memory ====
 
 
-    # ==== Add Workers to hosts in memory ====
+- name: Add workers' public ips to workers_ips
+  set_fact:
+    worker_ips: "{{ worker_ips }} + ['{{ item['public_ip'] }}']"
+  with_items: "{{ Worker_Response['instances'] }}"
+
+- name: Add workers as hosts to memory with worker_ips
+  add_host:
+    hostname: "{{ item }}"
+    ansible_ssh_private_key_file: "{{ region + '.' + ssh_key_name + '.pem' }}"
+    group: Workers
+    ansible_user: ec2-user
+  with_items: "{{ worker_ips }}"
 
 
-    - name: Add workers' public ips to workers_ips
-      set_fact:
-        worker_ips: "{{ worker_ips }} + ['{{ item['public_ip'] }}']"
-      with_items: "{{ Worker_Response['instances'] }}"
-
-    - name: Add workers as hosts to memory with worker_ips
-      add_host:
-        hostname: "{{ item }}"
-        ansible_ssh_private_key_file: "{{ ssh_key_name + '.pem'}}"
-        group: Workers
-        ansible_user: ec2-user
-      with_items: "{{ worker_ips }}"
+# ==== Wait for SSH for workers
 
 
-    # ==== Wait for SSH for workers
+- name: Wait for SSH to come up for workers
+  wait_for:
+    host: "{{ item }}"
+    port: 22
+    state: started
+  with_items: "{{ worker_ips }}"
+
+- name: Copy configs/storm-supervisors.conf to /home/ec2-user/apache-storm/conf/storm.yaml
+  copy:
+    src: configs/storm-supervisors.conf
+    dest: /home/ec2-user/apache-storm/conf/storm.yaml
+  delegate_to: "{{ item }}"
+  with_items: "{{ worker_ips }}"
+
+- name: Template configs/server.properties to /home/ec2-user/kafka/config/server.properties
+  template:
+      src: templates/server.properties.j2
+      dest: /home/ec2-user/kafka/config/server.properties
+  delegate_to: "{{ item }}"
+  loop: "{{ worker_ips }}"
+  loop_control:
+    index_var: kafka_ID
+
+- name: Set hostname of workers to workers public ip
+  hostname:
+    name: "{{ item }}"
+  delegate_to: "{{ item }}"
+  become: yes
+  with_items: "{{ worker_ips }}"
 
 
-    - name: Wait for SSH to come up for workers
-      wait_for:
-        host: "{{ item }}"
-        port: 22
-        state: started
-      with_items: "{{ worker_ips }}"
-
-    - name: Copy configs/storm-supervisors.conf to /home/ec2-user/apache-storm-1.2.1/conf/storm.yaml
-      copy:
-        src: configs/storm-supervisors.conf
-        dest: /home/ec2-user/apache-storm-1.2.1/conf/storm.yaml
-      delegate_to: "{{ item }}"
-      with_items: "{{ worker_ips }}"
+# ==== Start services on workers ====
 
 
-    # ==== Start services on workers ====
-
-    - name: Start storm-supervisor service on workers
-      systemd:
-        name: storm-supervisor
-        state: started
-        enabled: yes
-      become: yes
-      delegate_to: "{{ item }}"
-      register: enable_service
-      with_items: "{{ worker_ips }}"
-
-    - debug:
-        msg: "{{ enable_service }}"
+- name: Start storm-supervisor service on workers
+  systemd:
+    name: storm-supervisor
+    state: started
+    enabled: yes
+  become: yes
+  delegate_to: "{{ item }}"
+  register: enable_service
+  with_items: "{{ worker_ips }}"

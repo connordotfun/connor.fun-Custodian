@@ -1,271 +1,381 @@
-- name: Create Custodian Machine and Create AMI of Custodian
-  hosts: local
-  
-  vars_files:
-    - vars/keys.yaml
-    - vars/machines.yaml
-    - vars/config.yaml
+- name: Get Base AMI ID
+  ec2_ami_facts:
+    aws_access_key: "{{ aws_auth.access }}"
+    aws_secret_key: "{{ aws_auth.secret }}"
+    region: "{{ region }}"
+    owners: amazon
+    filters:
+      "name": "{{ base_ami_name }}"
+  register: base_ami
 
-  tasks:
+- name: Make log of base ami search
+  copy: 
+    content: "{{ base_ami | to_nice_yaml }}"
+    dest: logs/Base_AMI_search.yaml
 
-    - name: Get Base AMI ID
-      ec2_ami_facts:
-        aws_access_key: "{{ aws_auth.access }}"
-        aws_secret_key: "{{ aws_auth.secret }}"
-        region: "{{ region }}"
-        owners: amazon
-        filters:
-          "name": "{{ base_ami_name }}"
-      register: base_ami
-
-    - name: Make log of base ami search
-      copy: 
-        content: "{{ base_ami | to_nice_yaml }}"
-        dest: logs/Base_AMI_search.yaml
-
-    - name: Save AMI ID for generic linux
-      set_fact:
-        gen_ami_id: "{{ base_ami['images'][0]['image_id'] }}"
+- name: Save AMI ID for generic linux
+  set_fact:
+    gen_ami_id: "{{ base_ami['images'][0]['image_id'] }}"
 
 
-    # ==== Initialize Custodian ====
+# ==== Initialize Custodian ====
 
 
-    - name: Create Custodian/Base machine for AMI
-      ec2:
-        aws_access_key: "{{ aws_auth.access }}"
-        aws_secret_key: "{{ aws_auth.secret }}"
-        key_name: "{{ ssh_key_name }}"
-        group: "{{ Custodian.group }}"
-        instance_type: "{{ Custodian.instance_type }}"
-        image: "{{ gen_ami_id }}"
-        wait: true
-        region: "{{ region }}"
-        instance_tags: "{{ Custodian.tags }}"
-      register: Custodian_Response
+- name: Create Custodian/Base machine for AMI
+  ec2:
+    aws_access_key: "{{ aws_auth.access }}"
+    aws_secret_key: "{{ aws_auth.secret }}"
+    key_name: "{{ ssh_key_name }}"
+    group: "{{ Custodian.group }}"
+    instance_type: "{{ Custodian.instance_type }}"
+    image: "{{ gen_ami_id }}"
+    wait: true
+    region: "{{ region }}"
+    instance_tags: "{{ Custodian.tags }}"
+  register: Custodian_Response
 
-    - name: Make log of results from Custodian_ec2 generation
-      copy: 
-        content: "{{ Custodian_Response | to_nice_yaml }}"
-        dest: logs/Custodian_generation.yaml
+- name: Make log of results from Custodian_ec2 generation
+  copy: 
+    content: "{{ Custodian_Response | to_nice_yaml }}"
+    dest: logs/Custodian_generation.yaml
 
-    - name: Save public_ip, private_ip, and id of Custodian to friendly variables
-      set_fact:
-        Custodian_IP: "{{ Custodian_Response['instances'][0]['public_ip'] }}"
-        Custodian_Private: "{{ Custodian_Response['instances'][0]['private_ip'] }}"
-        Custodian_ID: "{{ Custodian_Response['instances'][0]['id'] }}"
+- name: Save public_ip, private_ip, and id of Custodian to friendly variables
+  set_fact:
+    Custodian_IP: "{{ Custodian_Response['instances'][0]['public_ip'] }}"
+    Custodian_Private: "{{ Custodian_Response['instances'][0]['private_ip'] }}"
+    Custodian_ID: "{{ Custodian_Response['instances'][0]['id'] }}"
 
-    - name: Add Custodian machine as host to memory with Custodian_IP as hostname
-      add_host:
-        hostname: "{{ Custodian_IP }}"
-        ansible_ssh_private_key_file: "{{ ssh_key_name + '.pem'}}"
-        group: Custodian_Host
-        ansible_user: ec2-user
-
-
-    # ==== Template conf files for storm ====
+- name: Add Custodian machine as host to memory with Custodian_IP as hostname
+  add_host:
+    hostname: "{{ Custodian_IP }}"
+    ansible_ssh_private_key_file: "{{ region + '.' + ssh_key_name + '.pem' }}"
+    group: Custodian_Host
+    ansible_user: ec2-user
 
 
-    - name: Template configs/nimbus.conf
-      template:
-          src: templates/storm-nimbus.conf.j2
-          dest: configs/storm-nimbus.conf
-
-    - name: Template configs/supervisors.conf
-      template:
-          src: templates/storm-supervisors.conf.j2
-          dest: configs/storm-supervisors.conf
-
-    - name: Template configs/sample.properties
-      template:
-          src: templates/sample.properties.j2
-          dest: configs/sample.properties
+# ==== Template conf files for storm and kafka ====
 
 
-    # ==== Start Installing Global Tools for Network ====
+- name: Template configs/nimbus.conf
+  template:
+      src: templates/storm-nimbus.conf.j2
+      dest: configs/storm-nimbus.conf
+
+- name: Template configs/supervisors.conf
+  template:
+      src: templates/storm-supervisors.conf.j2
+      dest: configs/storm-supervisors.conf
+
+- name: Template configs/sample.properties
+  template:
+      src: templates/sample.properties.j2
+      dest: configs/sample.properties
 
 
-    - name: Wait for SSH to come up
-      wait_for:
-        host: "{{ Custodian_IP }}"
-        port: 22 
-        state: started
-
-    - name: Unarchive the Apache-Storm files to /home/ec2-user
-      unarchive:
-        remote_src: yes
-        src: http://apache.claz.org/storm/apache-storm-1.2.1/apache-storm-1.2.1.tar.gz
-        dest: /home/ec2-user
-      delegate_to: "{{ Custodian_IP }}"
-
-    - name: Unarchive the Zookeeper files to /home/ec2-user
-      unarchive:
-        remote_src: yes
-        src: http://apache.claz.org/zookeeper/zookeeper-3.4.11/zookeeper-3.4.11.tar.gz
-        dest: /home/ec2-user
-      delegate_to: "{{ Custodian_IP }}"
-
-    - name: Create /home/ec2-user/zookeeper-3.4.11/data directory
-      file:
-        path: /home/ec2-user/zookeeper-3.4.11/data
-        state: directory
-      delegate_to: "{{ Custodian_IP }}"
-
-    - name: Copy configs/environment to /etc/environment
-      copy:
-        src: configs/environment
-        dest: /etc/environment
-      become: yes
-      delegate_to: "{{ Custodian_IP }}"
-
-    - name: Install java-1.8.0-openjdk on Custodian
-      yum:
-        name: java-1.8.0-openjdk
-        state: latest
-      become: yes
-      delegate_to: "{{ Custodian_IP }}"
-
-    - name: Wget maven repo information into /etc/yum.repos.d/epel-apache-maven.repo
-      get_url:
-        url: http://repos.fedorapeople.org/repos/dchen/apache-maven/epel-apache-maven.repo
-        dest: /etc/yum.repos.d/epel-apache-maven.repo
-      become: yes
-      delegate_to: "{{ Custodian_IP }}"
-
-    - name: Run SED command to go to version 7 (mvn 3.5.x)
-      command: sed -i s/\$releasever/7/g /etc/yum.repos.d/epel-apache-maven.repo
-      become: yes
-      delegate_to: "{{ Custodian_IP }}"
-
-    - name: Install apache-maven on Custodian
-      yum:
-        name: apache-maven
-        state: latest
-      become: yes
-      delegate_to: "{{ Custodian_IP }}"
-
-    - name: Install git on Custodian
-      yum:
-        name: git
-        state: latest
-      become: yes
-      delegate_to: "{{ Custodian_IP }}"
-
-    - name: Install services from servics folder *but do not enable any services copied*
-      copy:
-        src: services/
-        dest: /etc/systemd/system/
-      become: yes
-      delegate_to: "{{ Custodian_IP }}"
-      register: services_install
-
-    - name: Copy configs/storm-env.sh to /home/ec2-user/apache-storm-1.2.1/conf/storm-env.sh
-      copy:
-        src: configs/storm-env.sh
-        dest: /home/ec2-user/apache-storm-1.2.1/conf/storm-env.sh
-      delegate_to: "{{ Custodian_IP }}"
+# ==== Start Installing Global Tools for Network ====
 
 
-    # ==== Create AMI out of Custodian ====
+- name: Wait for SSH to come up
+  wait_for:
+    host: "{{ Custodian_IP }}"
+    port: 22 
+    state: started
+
+- name: Create /home/ec2-user/apache-storm
+  file:
+    path: /home/ec2-user/apache-storm
+    state: directory
+  delegate_to: "{{ Custodian_IP }}"
+
+- name: Create /home/ec2-user/zookeeper
+  file:
+    path: /home/ec2-user/zookeeper
+    state: directory
+  delegate_to: "{{ Custodian_IP }}"
+
+- name: Create /home/ec2-user/kafka
+  file:
+    path: /home/ec2-user/kafka
+    state: directory
+  delegate_to: "{{ Custodian_IP }}"    
+
+- name: Unarchive the Apache-Storm files to /home/ec2-user
+  unarchive:
+    remote_src: yes
+    src: http://apache.claz.org/storm/apache-storm-1.2.1/apache-storm-1.2.1.tar.gz
+    dest: /home/ec2-user/apache-storm/
+    extra_opts: [--strip-components=1]
+  delegate_to: "{{ Custodian_IP }}"
+
+- name: Unarchive the Zookeeper files to /home/ec2-user
+  unarchive:
+    remote_src: yes
+    src: http://apache.claz.org/zookeeper/zookeeper-3.4.11/zookeeper-3.4.11.tar.gz
+    dest: /home/ec2-user/zookeeper/
+    extra_opts: [--strip-components=1]
+  delegate_to: "{{ Custodian_IP }}"
+
+- name: Unarchive the kafka files to /home/ec2-user
+  unarchive:
+    remote_src: yes
+    src: http://mirrors.koehn.com/apache/kafka/1.1.0/kafka_2.11-1.1.0.tgz
+    dest: /home/ec2-user/kafka/
+    extra_opts: [--strip-components=1]
+  delegate_to: "{{ Custodian_IP }}"
+
+- name: Create /home/ec2-user/zookeeper/data directory
+  file:
+    path: /home/ec2-user/zookeeper/data
+    state: directory
+  delegate_to: "{{ Custodian_IP }}"
+
+- name: Copy configs/environment to /etc/environment
+  copy:
+    src: configs/environment
+    dest: /etc/environment
+  become: yes
+  delegate_to: "{{ Custodian_IP }}"
+
+- name: Copy configs/environmentmd to /etc/environmentmd
+  copy:
+    src: configs/environmentmd
+    dest: /etc/environmentmd
+  become: yes
+  delegate_to: "{{ Custodian_IP }}"
+
+- name: Wget maven repo information into /etc/yum.repos.d/epel-apache-maven.repo
+  get_url:
+    url: http://repos.fedorapeople.org/repos/dchen/apache-maven/epel-apache-maven.repo
+    dest: /etc/yum.repos.d/epel-apache-maven.repo
+  become: yes
+  delegate_to: "{{ Custodian_IP }}"
+
+- name: Run SED command to go to version 7 (mvn 3.5.x)
+  command: sed -i s/\$releasever/7/g /etc/yum.repos.d/epel-apache-maven.repo
+  become: yes
+  delegate_to: "{{ Custodian_IP }}"
+
+- name: Yum install on Custodian
+  yum:
+    name: java-1.8.0-openjdk, golang, apache-maven, git, gcc-c++, python3, python3-pip
+    state: latest
+  become: yes
+  delegate_to: "{{ Custodian_IP }}"
+
+- name: Install boto and boto3 for python3
+  command: pip3 install boto boto3
+  become: yes
+  delegate_to: "{{ Custodian_IP }}"
+
+- name: Install services from services folder *but do not enable any services copied*
+  copy:
+    src: services/
+    dest: /etc/systemd/system/
+  become: yes
+  delegate_to: "{{ Custodian_IP }}"
+  register: services_install
+
+- name: Copy configs/storm-env.sh to /home/ec2-user/apache-storm/conf/storm-env.sh
+  copy:
+    src: configs/storm-env.sh
+    dest: /home/ec2-user/apache-storm/conf/storm-env.sh
+  delegate_to: "{{ Custodian_IP }}"
+
+- name: git clone librdkafka
+  git:
+    repo: https://github.com/edenhill/librdkafka.git
+    dest: /home/ec2-user/librdkafka
+  delegate_to: "{{ Custodian_IP }}"
+
+- name: run install for librdkafka
+  script: configs/librdkafka_install.sh
+  args:
+    chdir: /home/ec2-user/librdkafka
+  become: yes
+  delegate_to: "{{ Custodian_IP }}"
+
+- name: Set Kafka ID
+  set_fact:
+    kafka_ID: 10
+
+- name: Template configs/server.properties to /home/ec2-user/kafka/config/server.properties
+  template:
+      src: templates/server.properties.j2
+      dest: /home/ec2-user/kafka/config/server.properties
+  delegate_to: "{{ Custodian_IP }}"
+
+- name: Enable kafka-broker service on AMI
+  systemd:
+    name: kafka-broker
+    state: started
+    enabled: yes
+  become: yes
+  delegate_to: "{{ Custodian_IP }}"
+
+- name: Enable storm-logviewer service on Custodian
+  systemd:
+    name: storm-logviewer
+    state: started
+    enabled: yes
+  become: yes
+  delegate_to: "{{ Custodian_IP }}"
 
 
-    - name: Create an AMI of the Custodian Machine
-      ec2_ami:
-        aws_access_key: "{{ aws_auth.access }}"
-        aws_secret_key: "{{ aws_auth.secret }}"
-        instance_id: "{{ Custodian_ID }}"
-        wait: yes
-        name: connor.fun-AMI
-        region: "{{ region }}"
-        tags:
-          "Name": connor.fun-AMI
-          "Team Name": connor.fun
-      register: AMI_Response
-
-    - name: Make log of AMI generation
-      copy: 
-        content: "{{ AMI_Response | to_nice_json }}"
-        dest: logs/AMI_generation.yaml
+# ==== Create AMI out of Custodian ====
 
 
-    # ==== Give Custodian Official Role of Nimbus, Zookeeper, and UI host ====
+- name: test out ec2_ami_facts
+  ec2_ami_facts:
+    aws_access_key: "{{ aws_auth.access }}"
+    aws_secret_key: "{{ aws_auth.secret }}"
+    describe_image_attributes: yes
+    region: "{{ region }}"
+    filters:
+      name: connor.fun-AMI
+  register: AMI_Search
 
-    
-    - name: Copy configs/zoo.cfg to /home/ec2-user/zookeeper-3.4.11/conf/zoo.cfg
-      copy:
-        src: configs/zoo.cfg
-        dest: /home/ec2-user/zookeeper-3.4.11/conf/zoo.cfg
-      delegate_to: "{{ Custodian_IP }}"
+- name: Create an AMI of the Custodian Machine
+  ec2_ami:
+    aws_access_key: "{{ aws_auth.access }}"
+    aws_secret_key: "{{ aws_auth.secret }}"
+    instance_id: "{{ Custodian_ID }}"
+    wait: yes
+    name: connor.fun-AMI
+    region: "{{ region }}"
+    delete_snapshot: yes
+    tags:
+      "Name": connor.fun-AMI
+      "Team Name": connor.fun
+  register: AMI_Response
+  when: AMI_Search["images"] == []
 
-    - name: Copy configs/storm-nimbus.conf to /home/ec2-user/apache-storm-1.2.1/conf/storm.yaml
-      copy:
-        src: configs/storm-nimbus.conf
-        dest: /home/ec2-user/apache-storm-1.2.1/conf/storm.yaml
-      delegate_to: "{{ Custodian_IP }}"
+- name: Make log of AMI generation
+  copy: 
+    content: "{{ AMI_Response | to_nice_yaml }}"
+    dest: logs/AMI_generation.yaml
+  when: AMI_Search["images"] == []
 
-    - name: Enable zookeeper service on Custodian
-      systemd:
-        name: zookeeper
-        state: started
-        enabled: yes
-      become: yes
-      delegate_to: "{{ Custodian_IP }}"
-      register: enable_service
-
-    - name: Enable storm-nimbus service on Custodian
-      systemd:
-        name: storm-nimbus
-        state: started
-        enabled: yes
-      become: yes
-      delegate_to: "{{ Custodian_IP }}"
-      register: enable_service
-
-    - name: Enable storm-ui service on Custodian
-      systemd:
-        name: storm-ui
-        state: started
-        enabled: yes
-      become: yes
-      delegate_to: "{{ Custodian_IP }}"
-      register: enable_service
+- name: Make log of AMI generation
+  copy: 
+    content: "{{ AMI_Search['images'][0] | to_nice_yaml }}"
+    dest: logs/AMI_generation.yaml
+  when: AMI_Search["images"] != []
 
 
-    # ==== Creation of Storm Topology ====
+# ==== Give Custodian Official Role of Nimbus, Zookeeper, and UI host ====
 
 
-    - name: Creating directory /home/ec2-user/connor.fun-Storm to hold Storm Submodule
-      file:
-        path: /home/ec2-user/connor.fun-Storm
-        state: directory
-      delegate_to: "{{ Custodian_IP }}"
+- name: Set hostname of Custodian to Custodian IP
+  hostname:
+    name: "{{ Custodian_IP }}"
+  become: yes
+  delegate_to: "{{ Custodian_IP }}"
 
-    - name: Copying ../Storm/ to /home/ec2-user/connor.fun-Storm
-      copy:
-        src: ../Storm/
-        dest: /home/ec2-user/connor.fun-Storm
-      delegate_to: "{{ Custodian_IP }}"
+- name: Copy configs/zoo.cfg to /home/ec2-user/zookeeper/conf/zoo.cfg
+  copy:
+    src: configs/zoo.cfg
+    dest: /home/ec2-user/zookeeper/conf/zoo.cfg
+  delegate_to: "{{ Custodian_IP }}"
 
-    - name: Copying configs/sample.properties to /home/ec2-user/connor.fun-Storm/sample.properties
-      copy:
-        src: configs/sample.properties
-        dest: /home/ec2-user/connor.fun-Storm
-      delegate_to: "{{ Custodian_IP }}"
+- name: Copy configs/storm-nimbus.conf to /home/ec2-user/apache-storm/conf/storm.yaml
+  copy:
+    src: configs/storm-nimbus.conf
+    dest: /home/ec2-user/apache-storm/conf/storm.yaml
+  delegate_to: "{{ Custodian_IP }}"
 
-    - name: Running mvn install inside of /home/ec2-user/connor.fun-Storm
-      command: mvn install:install-file -Dfile=lib/kinesis-storm-spout-1.1.2-SNAPSHOT.jar -DgroupId=com.amazonaws.services.kinesis.stormspout -DartifactId=kinesis-storm-spout -Dversion=1.1.2-SNAPSHOT -Dpackaging=jar
-      args:
-        chdir: /home/ec2-user/connor.fun-Storm
-      delegate_to: "{{ Custodian_IP }}"
+- name: Enable zookeeper service on Custodian
+  systemd:
+    name: zookeeper
+    state: started
+    enabled: yes
+  become: yes
+  delegate_to: "{{ Custodian_IP }}"
 
-    - name: Running mvn package inside of /home/ec2-user/connor.fun-Storm
-      command: mvn package
-      args:
-        chdir: /home/ec2-user/connor.fun-Storm
-      delegate_to: "{{ Custodian_IP }}"
+- name: Enable storm-nimbus service on Custodian
+  systemd:
+    name: storm-nimbus
+    state: started
+    enabled: yes
+  become: yes
+  delegate_to: "{{ Custodian_IP }}"
 
-    - name: Pushing Storm topology from /home/ec2-user/connor.fun-Storm
-      command: /home/ec2-user/apache-storm-1.2.1/bin/storm jar target/storm-1.0.jar fun.connor.storm.ProcessTopology ./sample.properties RemoteMode
-      args:
-        chdir: /home/ec2-user/connor.fun-Storm
-      delegate_to: "{{ Custodian_IP }}"
+- name: Enable storm-ui service on Custodian
+  systemd:
+    name: storm-ui
+    state: started
+    enabled: yes
+  become: yes
+  delegate_to: "{{ Custodian_IP }}"
+
+
+
+# ==== Creation of Storm Topology ====
+
+
+- name: Creating directory /home/ec2-user/connor.fun-Storm to hold Storm Submodule
+  file:
+    path: /home/ec2-user/connor.fun-Storm
+    state: directory
+  delegate_to: "{{ Custodian_IP }}"
+
+- name: Creating directory /home/ec2-user/connor.fun-StreamProducer to hold Stream Submodule
+  file:
+    path: /home/ec2-user/connor.fun-StreamProducer
+    state: directory
+  delegate_to: "{{ Custodian_IP }}"
+
+- name: Copying ../Storm/ to /home/ec2-user/connor.fun-Storm
+  copy:
+    src: ../Storm/
+    dest: /home/ec2-user/connor.fun-Storm
+  delegate_to: "{{ Custodian_IP }}"
+
+- name: Copying ../Stream/ to /home/ec2-user/connor.fun-StreamProducer
+  copy:
+    src: ../Stream/
+    dest: /home/ec2-user/connor.fun-StreamProducer
+  delegate_to: "{{ Custodian_IP }}"
+
+- name: chmod +x on /home/ec2-user/connor.fun-StreamProducer/regionSpout
+  file:
+    path: /home/ec2-user/connor.fun-StreamProducer/regionSpout
+    mode: "u+x"
+  delegate_to: "{{ Custodian_IP }}"
+
+- name: Copying configs/sample.properties to /home/ec2-user/connor.fun-Storm/sample.properties
+  copy:
+    src: configs/sample.properties
+    dest: /home/ec2-user/connor.fun-Storm
+  delegate_to: "{{ Custodian_IP }}"
+
+- name: Running mvn install inside of /home/ec2-user/connor.fun-Storm
+  command: mvn install:install-file -Dfile=lib/kinesis-storm-spout-1.1.2-SNAPSHOT.jar -DgroupId=com.amazonaws.services.kinesis.stormspout -DartifactId=kinesis-storm-spout -Dversion=1.1.2-SNAPSHOT -Dpackaging=jar
+  args:
+    chdir: /home/ec2-user/connor.fun-Storm
+  delegate_to: "{{ Custodian_IP }}"
+
+- name: Running mvn package inside of /home/ec2-user/connor.fun-Storm
+  command: mvn package
+  args:
+    chdir: /home/ec2-user/connor.fun-Storm
+  delegate_to: "{{ Custodian_IP }}"
+
+- name: Pushing Storm topology from /home/ec2-user/connor.fun-Storm
+  command: /home/ec2-user/apache-storm/bin/storm jar target/storm-1.0.jar fun.connor.storm.ProcessTopology ./sample.properties RemoteMode
+  args:
+    chdir: /home/ec2-user/connor.fun-Storm
+  delegate_to: "{{ Custodian_IP }}"
+
+- name: Wget locations.json for stream producer
+  get_url:
+    url: https://cubigdataclass.github.io/connor.fun-SectorGenerator/data/locations.json
+    dest: /home/ec2-user/connor.fun-StreamProducer/locations.json
+  delegate_to: "{{ Custodian_IP }}"
+
+- name: Start the streamspout service
+  systemd:
+    name: streamproducer
+    state: started
+    enabled: yes
+  become: yes
+  delegate_to: "{{ Custodian_IP }}"
