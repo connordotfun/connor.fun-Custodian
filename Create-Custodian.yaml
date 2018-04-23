@@ -198,12 +198,6 @@
   set_fact:
     kafka_ID: 10
 
-- name: Template configs/server.properties to /home/ec2-user/kafka/config/server.properties
-  template:
-      src: templates/server.properties.j2
-      dest: /home/ec2-user/kafka/config/server.properties
-  delegate_to: "{{ Custodian_IP }}"
-
 - name: Enable kafka-broker service on AMI
   systemd:
     name: kafka-broker
@@ -234,7 +228,7 @@
       name: connor.fun-AMI
   register: AMI_Search
 
-- name: Create an AMI of the Custodian Machine
+- name: Create an AMI out of the Custodian Machine
   ec2_ami:
     aws_access_key: "{{ aws_auth.access }}"
     aws_secret_key: "{{ aws_auth.secret }}"
@@ -264,6 +258,12 @@
 
 # ==== Give Custodian Official Role of Nimbus, Zookeeper, and UI host ====
 
+
+- name: Template configs/server.properties to /home/ec2-user/kafka/config/server.properties
+  template:
+      src: templates/server.properties.j2
+      dest: /home/ec2-user/kafka/config/server.properties
+  delegate_to: "{{ Custodian_IP }}"
 
 - name: Set hostname of Custodian to Custodian IP
   hostname:
@@ -308,37 +308,27 @@
   delegate_to: "{{ Custodian_IP }}"
 
 
-
 # ==== Creation of Storm Topology ====
 
 
-- name: Creating directory /home/ec2-user/connor.fun-Storm to hold Storm Submodule
-  file:
-    path: /home/ec2-user/connor.fun-Storm
-    state: directory
-  delegate_to: "{{ Custodian_IP }}"
-
-- name: Creating directory /home/ec2-user/connor.fun-StreamProducer to hold Stream Submodule
-  file:
-    path: /home/ec2-user/connor.fun-StreamProducer
-    state: directory
-  delegate_to: "{{ Custodian_IP }}"
-
 - name: Copying ../Storm/ to /home/ec2-user/connor.fun-Storm
-  copy:
-    src: ../Storm/
-    dest: /home/ec2-user/connor.fun-Storm
-  delegate_to: "{{ Custodian_IP }}"
+  command: "rsync --cvs-exclude -rave \"ssh -i {{ region + '.' + ssh_key_name + '.pem' }}\" ../Storm/ ec2-user@{{ Custodian_IP }}:/home/ec2-user/connor.fun-Storm/"
 
 - name: Copying ../Stream/ to /home/ec2-user/connor.fun-StreamProducer
-  copy:
-    src: ../Stream/
-    dest: /home/ec2-user/connor.fun-StreamProducer
-  delegate_to: "{{ Custodian_IP }}"
+  command: "rsync --cvs-exclude -rave \"ssh -i {{ region + '.' + ssh_key_name + '.pem' }}\" ../Stream/ ec2-user@{{ Custodian_IP }}:/home/ec2-user/connor.fun-StreamProducer/"
+
+- name: Copying ../WebServer/ to /home/ec2-user/connor.fun-WebServer
+  command: "rsync --cvs-exclude -rave \"ssh -i {{ region + '.' + ssh_key_name + '.pem' }}\" ../WebServer/ ec2-user@{{ Custodian_IP }}:/home/ec2-user/connor.fun-WebServer/"
 
 - name: chmod +x on /home/ec2-user/connor.fun-StreamProducer/regionSpout
   file:
     path: /home/ec2-user/connor.fun-StreamProducer/regionSpout
+    mode: "u+x"
+  delegate_to: "{{ Custodian_IP }}"
+
+- name: chmod +x on /home/ec2-user/connor.fun-WebServer/webServer
+  file:
+    path: /home/ec2-user/connor.fun-WebServer/webServer
     mode: "u+x"
   delegate_to: "{{ Custodian_IP }}"
 
@@ -374,7 +364,15 @@
 
 - name: Start the streamspout service
   systemd:
-    name: streamproducer
+    name: regionspout
+    state: started
+    enabled: yes
+  become: yes
+  delegate_to: "{{ Custodian_IP }}"
+
+- name: Start the webServer service
+  systemd:
+    name: webserver
     state: started
     enabled: yes
   become: yes

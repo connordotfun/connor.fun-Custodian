@@ -1,5 +1,5 @@
 [Unit]
-Description=Storm Logviewer daemon
+Description=Kafka Broker daemon
 
 [Service]
 Type=simple

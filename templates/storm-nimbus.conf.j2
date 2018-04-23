@@ -1,5 +1,5 @@
 # /home/ec2-user/apache-storm-1.2.1/conf/storm.yaml ON THE NIMBUS MACHINE
 
 storm.zookeeper.servers:
-    - "localhost"
+    - "{{ Custodian_IP }}"
 nimbus.seeds: ["{{ Custodian_Private }}"]
