@@ -163,7 +163,7 @@
   delegate_to: "{{ Custodian_IP }}"
 
 - name: Install boto and boto3 for python3
-  command: pip3 install boto boto3
+  command: pip3 install boto boto3 numpy sklearn
   become: yes
   delegate_to: "{{ Custodian_IP }}"
 
