@@ -110,7 +110,7 @@
 - name: Unarchive the Zookeeper files to /home/ec2-user
   unarchive:
     remote_src: yes
-    src: http://apache.claz.org/zookeeper/zookeeper-3.4.11/zookeeper-3.4.11.tar.gz
+    src: http://apache.cs.utah.edu/zookeeper/current/zookeeper-3.4.10.tar.gz
     dest: /home/ec2-user/zookeeper/
     extra_opts: [--strip-components=1]
   delegate_to: "{{ Custodian_IP }}"
@@ -294,30 +294,6 @@
     dest: /home/ec2-user/apache-storm/conf/storm.yaml
   delegate_to: "{{ Custodian_IP }}"
 
-- name: Enable zookeeper service on Custodian
-  systemd:
-    name: zookeeper
-    state: started
-    enabled: yes
-  become: yes
-  delegate_to: "{{ Custodian_IP }}"
-
-- name: Enable storm-nimbus service on Custodian
-  systemd:
-    name: storm-nimbus
-    state: started
-    enabled: yes
-  become: yes
-  delegate_to: "{{ Custodian_IP }}"
-
-- name: Enable storm-ui service on Custodian
-  systemd:
-    name: storm-ui
-    state: started
-    enabled: yes
-  become: yes
-  delegate_to: "{{ Custodian_IP }}"
-
 
 # ==== Creation of Storm Topology ====
 
@@ -343,6 +319,12 @@
     mode: "u+x"
   delegate_to: "{{ Custodian_IP }}"
 
+- name: wget model into Custodian
+  get_url:
+    url: https://s3-us-west-2.amazonaws.com/connorisfun/modelv01.pickle
+    dest: /home/ec2-user/connor.fun-Storm/multilang/resources
+  delegate_to: "{{ Custodian_IP }}"
+
 - name: Copying configs/sample.properties to /home/ec2-user/connor.fun-Storm/sample.properties
   copy:
     src: configs/sample.properties
@@ -361,7 +343,7 @@
     chdir: /home/ec2-user/connor.fun-Storm
   delegate_to: "{{ Custodian_IP }}"
 
-- name: Start the streamspout service
+- name: Enable the streamspout service
   systemd:
     name: regionspout
     state: started
@@ -369,7 +351,31 @@
   become: yes
   delegate_to: "{{ Custodian_IP }}"
 
-- name: Start the webServer service
+- name: Enable zookeeper service on Custodian
+  systemd:
+    name: zookeeper
+    state: started
+    enabled: yes
+  become: yes
+  delegate_to: "{{ Custodian_IP }}"
+
+- name: Enable storm-nimbus service on Custodian
+  systemd:
+    name: storm-nimbus
+    state: started
+    enabled: yes
+  become: yes
+  delegate_to: "{{ Custodian_IP }}"
+
+- name: Enable storm-ui service on Custodian
+  systemd:
+    name: storm-ui
+    state: started
+    enabled: yes
+  become: yes
+  delegate_to: "{{ Custodian_IP }}"
+
+- name: Enable the webServer service
   systemd:
     name: webserver
     state: started
