@@ -209,22 +209,6 @@
   set_fact:
     kafka_ID: 10
 
-- name: Enable kafka-broker service on AMI
-  systemd:
-    name: kafka-broker
-    state: started
-    enabled: yes
-  become: yes
-  delegate_to: "{{ Custodian_IP }}"
-
-- name: Enable storm-logviewer service on Custodian
-  systemd:
-    name: storm-logviewer
-    state: started
-    enabled: yes
-  become: yes
-  delegate_to: "{{ Custodian_IP }}"
-
 
 # ==== Create AMI out of Custodian ====
 
@@ -331,29 +315,25 @@
     dest: /home/ec2-user/connor.fun-Storm
   delegate_to: "{{ Custodian_IP }}"
 
-- name: Running mvn package inside of /home/ec2-user/connor.fun-Storm
-  command: mvn package
-  args:
-    chdir: /home/ec2-user/connor.fun-Storm
-  delegate_to: "{{ Custodian_IP }}"
-
-- name: Pushing Storm topology from /home/ec2-user/connor.fun-Storm
-  command: /home/ec2-user/apache-storm/bin/storm jar target/storm-1.0.jar fun.connor.storm.BothTopology ./sample.properties
-  args:
-    chdir: /home/ec2-user/connor.fun-Storm
-  delegate_to: "{{ Custodian_IP }}"
-
-- name: Enable the streamspout service
+- name: Enable zookeeper service on Custodian
   systemd:
-    name: regionspout
+    name: zookeeper
     state: started
     enabled: yes
   become: yes
   delegate_to: "{{ Custodian_IP }}"
 
-- name: Enable zookeeper service on Custodian
+- name: Enable kafka-broker service on AMI
   systemd:
-    name: zookeeper
+    name: kafka-broker
+    state: started
+    enabled: yes
+  become: yes
+  delegate_to: "{{ Custodian_IP }}"
+
+- name: Enable storm-logviewer service on Custodian
+  systemd:
+    name: storm-logviewer
     state: started
     enabled: yes
   become: yes
@@ -370,6 +350,26 @@
 - name: Enable storm-ui service on Custodian
   systemd:
     name: storm-ui
+    state: started
+    enabled: yes
+  become: yes
+  delegate_to: "{{ Custodian_IP }}"
+
+- name: Running mvn package inside of /home/ec2-user/connor.fun-Storm
+  command: mvn package
+  args:
+    chdir: /home/ec2-user/connor.fun-Storm
+  delegate_to: "{{ Custodian_IP }}"
+
+- name: Pushing Storm topology from /home/ec2-user/connor.fun-Storm
+  command: /home/ec2-user/apache-storm/bin/storm jar target/storm-1.0.jar fun.connor.storm.BothTopology ./sample.properties
+  args:
+    chdir: /home/ec2-user/connor.fun-Storm
+  delegate_to: "{{ Custodian_IP }}"
+
+- name: Enable the streamspout service
+  systemd:
+    name: regionspout
     state: started
     enabled: yes
   become: yes

@@ -96,6 +96,13 @@
 
 # ==== Start services on workers ====
 
+- name: Enable kafka-broker service on AMI
+  systemd:
+    name: kafka-broker
+    state: started
+    enabled: yes
+  become: yes
+  delegate_to: "{{ worker_ips }}"
 
 - name: Start storm-supervisor service on workers
   systemd:
@@ -106,3 +113,11 @@
   delegate_to: "{{ item }}"
   register: enable_service
   with_items: "{{ worker_ips }}"
+
+- name: Enable storm-logviewer service on Custodian
+  systemd:
+    name: storm-logviewer
+    state: started
+    enabled: yes
+  become: yes
+  delegate_to: "{{ worker_ips }}"
