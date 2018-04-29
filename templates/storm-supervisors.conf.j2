@@ -1,5 +1,5 @@
 # /home/ec2-user/apache-storm-1.2.1/conf/storm.yaml ON THE WORKER MACHINES
 
 storm.zookeeper.servers:
-    - "{{ Custodian_Private }}"
-nimbus.seeds: ["{{ Custodian_Private }}"]
+    - "{{ Custodian_IP }}"
+nimbus.seeds: ["{{ Custodian_IP }}"]
