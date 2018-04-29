@@ -1,7 +1,7 @@
 - name: Create the connor.fun cluster
   hosts: local
   gather_facts: no
-  
+
   vars_files:
     - vars/keys.yaml
     - vars/security_groups.yaml
@@ -13,7 +13,7 @@
     doCustodian: "false"
     doWorkers: "false"
     doCreate: "false"
-  
+
   tasks:
     - include: Prep-AWS.yaml
       when: doPrep == "true" or doCreate == "true"

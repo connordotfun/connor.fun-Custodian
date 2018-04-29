@@ -1,0 +1,14 @@
+[Unit]
+Description=webServer daemon
+
+[Service]
+EnvironmentFile=/etc/environmentmd
+Type=simple
+User=root
+Group=root
+Restart=on-failure
+WorkingDirectory=/home/ec2-user/connor.fun-WebServer
+ExecStart=/home/ec2-user/connor.fun-WebServer/webServer 80 localhost 9092
+
+[Install]
+WantedBy=multi-user.target

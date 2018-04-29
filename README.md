@@ -115,3 +115,5 @@ ansible-playbook -i hosts Create.yaml --extra-vars "doPrep=false doCustodian=tru
 ## Other Notes
 
 1. If you want to add more workers, you must take down all current workers and create a new set of workers with the script due to a Kafka worker_id dependency. (These actions can be done at the same time)
+
+2. rsync is a dependency.
