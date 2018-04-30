@@ -15,9 +15,9 @@
   set_fact:
       Custodian_IP: "{{ Custodian_log['instances'][0]['public_ip'] }}"
 
-- name: Set worker_ips fact
-  set_fact:
-      worker_ips: []
+# - name: Set worker_ips fact
+#   set_fact:
+#       worker_ips: []
 
 
 # ==== Create Worker Machine instances ====
@@ -42,22 +42,34 @@
     content: "{{ Worker_Response | to_nice_yaml }}"
     dest: logs/Worker_generation.yaml
 
+# - name: pause?
+#   pause:
+#     seconds: 10
+
+# - debug:
+#     msg: "{{ item['public_ip'] }}"
+#   with_items: "{{ Worker_Response['instances'] }}"
+
+# - name: pause?
+#   pause:
+#     seconds: 10
+
 
 # ==== Add Workers to hosts in memory ====
 
 
-- name: Add workers' public ips to workers_ips
-  set_fact:
-    worker_ips: "{{ worker_ips }} + ['{{ item['public_ip'] }}']"
-  with_items: "{{ Worker_Response['instances'] }}"
+# - name: Add workers' public ips to workers_ips
+#   set_fact:
+#     worker_ips: "{{ worker_ips }} + ['{{ item['public_ip'] }}']"
+#   with_items: "{{ Worker_Response['instances'] }}"
 
 - name: Add workers as hosts to memory with worker_ips
   add_host:
-    hostname: "{{ item }}"
+    hostname: "{{ item['public_ip'] }}"
     ansible_ssh_private_key_file: "{{ region + '.' + ssh_key_name + '.pem' }}"
     group: Workers
     ansible_user: ec2-user
-  with_items: "{{ worker_ips }}"
+  with_items: "{{ Worker_Response['instances'] }}"
 
 
 # ==== Wait for SSH for workers
@@ -65,33 +77,33 @@
 
 - name: Wait for SSH to come up for workers
   wait_for:
-    host: "{{ item }}"
+    host: "{{ item['public_ip'] }}"
     port: 22
     state: started
-  with_items: "{{ worker_ips }}"
+  with_items: "{{ Worker_Response['instances'] }}"
 
 - name: Copy configs/storm-supervisors.conf to /home/ec2-user/apache-storm/conf/storm.yaml
   copy:
     src: configs/storm-supervisors.conf
     dest: /home/ec2-user/apache-storm/conf/storm.yaml
-  delegate_to: "{{ item }}"
-  with_items: "{{ worker_ips }}"
+  delegate_to: "{{ item['public_ip'] }}"
+  with_items: "{{ Worker_Response['instances'] }}"
 
 - name: Template configs/server.properties to /home/ec2-user/kafka/config/server.properties
   template:
       src: templates/server.properties.j2
       dest: /home/ec2-user/kafka/config/server.properties
-  delegate_to: "{{ item }}"
-  loop: "{{ worker_ips }}"
+  delegate_to: "{{ item['public_ip'] }}"
+  loop: "{{ Worker_Response['instances'] }}"
   loop_control:
     index_var: kafka_ID
 
 - name: Set hostname of workers to workers public ip
   hostname:
-    name: "{{ item }}"
-  delegate_to: "{{ item }}"
+    name: "{{ item['public_ip'] }}"
+  delegate_to: "{{ item['public_ip'] }}"
   become: yes
-  with_items: "{{ worker_ips }}"
+  with_items: "{{ Worker_Response['instances'] }}"
 
 
 # ==== Start services on workers ====
@@ -102,7 +114,8 @@
     state: started
     enabled: yes
   become: yes
-  delegate_to: "{{ worker_ips }}"
+  delegate_to: "{{ item['public_ip'] }}"
+  with_items: "{{ Worker_Response['instances'] }}"
 
 - name: Start storm-supervisor service on workers
   systemd:
@@ -110,9 +123,10 @@
     state: started
     enabled: yes
   become: yes
-  delegate_to: "{{ item }}"
+  delegate_to: "{{ item['public_ip'] }}"
   register: enable_service
-  with_items: "{{ worker_ips }}"
+  delegate_to: "{{ item['public_ip'] }}"
+  with_items: "{{ Worker_Response['instances'] }}"
 
 - name: Enable storm-logviewer service on Custodian
   systemd:
@@ -120,4 +134,5 @@
     state: started
     enabled: yes
   become: yes
-  delegate_to: "{{ worker_ips }}"
+  delegate_to: "{{ item['public_ip'] }}"
+  with_items: "{{ Worker_Response['instances'] }}"
